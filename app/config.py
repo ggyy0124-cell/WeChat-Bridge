@@ -98,7 +98,6 @@ DEFAULT_CONFIG = {
     "webhook_url": DEFAULT_WEBHOOK_URL,
     "webhook_mode": "all_messages",
     "webhook_timeout": 5,
-    "telemetry_enabled": True,
 }
 
 
@@ -114,7 +113,8 @@ def validate_config(cfg: dict) -> dict:
     valid = cfg.copy()
     valid["enabled"] = bool(valid.get("enabled"))
     valid["webhook_enabled"] = bool(valid.get("webhook_enabled"))
-    valid["telemetry_enabled"] = bool(valid.get("telemetry_enabled"))
+    # 遥测功能已移除：丢弃旧版配置文件里残留的开关，避免继续保存或对外暴露
+    valid.pop("telemetry_enabled", None)
 
     try:
         valid["webhook_timeout"] = max(1, min(30, int(valid.get("webhook_timeout", 5))))

@@ -648,6 +648,24 @@ class WebAppServerTests(unittest.TestCase):
         self.assertEqual(saved["webhook_mode"], "all_messages")
         self.assertEqual(saved["webhook_timeout"], 9)
 
+    def test_api_ai_config_ignores_removed_telemetry_flag(self):
+        payload = json.dumps({"webhook_timeout": 7, "telemetry_enabled": True}).encode("utf-8")
+        status, _, body = self._request(
+            "/api/ai_config",
+            method="POST",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(status, 200, body)
+
+        saved = cfg.load_config()
+        self.assertEqual(saved["webhook_timeout"], 7)
+        self.assertNotIn("telemetry_enabled", saved)
+
+        status, _, body = self._request("/api/ai_config")
+        self.assertEqual(status, 200, body)
+        self.assertNotIn("telemetry_enabled", json.loads(body))
+
     def test_api_ai_analyze_calls_one_shot(self):
         self.bridge.ai_manager = _FakeAIManager()
         payload = json.dumps({"prompt": "分析签到失败", "system_prompt": "你是青龙运维助手"}).encode("utf-8")

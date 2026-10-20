@@ -31,3 +31,10 @@ def test_delivery_panel_exposes_consecutive_send_count():
 def test_media_styles_include_file_and_quote_blocks():
     assert ".msg-bubble .chat-file" in HTML_TEMPLATE
     assert ".msg-bubble .quote-block" in HTML_TEMPLATE
+
+
+def test_settings_have_no_telemetry_or_anonymous_stats_controls():
+    for page in (LOGGED_IN_CONTENT, LOGGED_IN_JS):
+        assert "telemetry" not in page.lower()
+        assert "匿名统计" not in page
+        assert "匿名使用统计" not in page

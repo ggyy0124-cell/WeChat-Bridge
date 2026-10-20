@@ -19,7 +19,6 @@
 下载地址：
 
 - GitHub ZIP：`https://github.com/yuuouu/WeChat-Bridge/archive/refs/heads/main.zip`
-- CDN 代理 ZIP：`https://wb.yuuou.qzz.io/archive/main.zip`
 
 如果使用浏览器下载，下载完成后解压，将解压出的 `WeChat-Bridge-main` 文件夹重命名为 `wechat-bridge`，然后进入该目录执行启动脚本。
 
@@ -35,12 +34,6 @@ python3 -m pip install -r app/requirements.txt
 bash scripts/start.sh
 ```
 
-如果 GitHub 下载较慢或不可用，可以把第一行替换为：
-
-```bash
-curl -L -o wechat-bridge.zip https://wb.yuuou.qzz.io/archive/main.zip
-```
-
 **Windows PowerShell：**
 
 ```powershell
@@ -51,12 +44,6 @@ cd .\wechat-bridge
 
 python -m pip install -r app\requirements.txt
 scripts\start.bat
-```
-
-如果 GitHub 下载较慢或不可用，可以把第一行替换为：
-
-```powershell
-Invoke-WebRequest -Uri "https://wb.yuuou.qzz.io/archive/main.zip" -OutFile "wechat-bridge.zip"
 ```
 
 启动完成后打开 `http://localhost:5200`，扫码登录即可。后续启动和停止可继续使用 `scripts/start.*`、`scripts/stop.*`。
@@ -130,9 +117,7 @@ scripts\stop.bat           # 停止后台服务
 
 ## 版本更新与升级
 
-程序每次启动时会自动检测 GitHub 是否有新版本，并在运行日志 (`data/run.log`) 中输出提醒。
-
-你也可以随时手动更新至最新版本：
+程序不会在启动时检查更新，也不会访问任何版本检查服务。请定期关注 [Releases](https://github.com/ggyy0124-cell/WeChat-Bridge/releases)，并按下面的方式手动更新：
 
 **原生安装 (Git) 更新：**
 ```bash

@@ -1,7 +1,7 @@
 """config 模块单元测试。
 
 覆盖：默认配置加载、环境变量覆盖、Webhook 参数校验、keepalive 旧字段迁移、
-save_config 自动创建目录、get_provider_info 兜底。
+已移除遥测开关的旧配置清理、save_config 自动创建目录、get_provider_info 兜底。
 """
 
 import json
@@ -173,6 +173,36 @@ class KeepaliveMigrationTests(unittest.TestCase):
         config = cfg.load_config()
         self.assertEqual(config["keepalive_remind_minutes"], 1380)
         self.assertNotIn("keepalive_23h58m", config)
+
+
+class RemovedTelemetryKeyTests(unittest.TestCase):
+    """遥测功能已移除：旧配置文件里残留的 telemetry_enabled 不应再出现在配置中。"""
+
+    def setUp(self):
+        cfg._invalidate_config_cache()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self._orig = cfg.CONFIG_FILE
+        cfg.CONFIG_FILE = str(Path(self.tempdir.name) / "ai_config.json")
+
+    def tearDown(self):
+        cfg.CONFIG_FILE = self._orig
+        self.tempdir.cleanup()
+
+    def test_default_config_has_no_telemetry_switch(self):
+        self.assertNotIn("telemetry_enabled", cfg.DEFAULT_CONFIG)
+
+    def test_legacy_telemetry_flag_is_dropped_on_load(self):
+        with open(cfg.CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump({**cfg.DEFAULT_CONFIG, "telemetry_enabled": True}, f)
+        config = cfg.load_config()
+        self.assertNotIn("telemetry_enabled", config)
+
+    def test_legacy_telemetry_flag_is_not_persisted_again(self):
+        with open(cfg.CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump({**cfg.DEFAULT_CONFIG, "telemetry_enabled": True}, f)
+        cfg.save_config(cfg.load_config())
+        with open(cfg.CONFIG_FILE, encoding="utf-8") as f:
+            self.assertNotIn("telemetry_enabled", json.load(f))
 
 
 class SaveConfigTests(unittest.TestCase):

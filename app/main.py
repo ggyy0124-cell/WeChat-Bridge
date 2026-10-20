@@ -44,7 +44,6 @@ import config as cfg
 import db
 import web
 from accounts import AccountManager
-from telemetry import TelemetryClient
 from version import __version__
 
 
@@ -52,9 +51,6 @@ def main():
     port = int(os.environ.get("PORT", "5200"))
     # Docker 容器内不应打开浏览器
     auto_open = os.environ.get("NO_BROWSER", "").lower() not in ("1", "true", "yes")
-    account_manager = None
-    telemetry_client = None
-    first_telemetry_report = True
 
     logger.info("=" * 50)
     logger.info("WeChat Bridge 启动中...")
@@ -76,110 +72,6 @@ def main():
     logger.info("API Token: %s", "已设置" if os.environ.get("API_TOKEN") else "(未设置，接口无鉴权)")
     logger.info("日志文件: %s", _log_file)
     logger.info("=" * 50)
-
-    # ==== 检测更新 ====
-    def check_for_updates():
-        nonlocal first_telemetry_report, telemetry_client
-        import time as _time
-
-        # 延迟 10 秒启动第一次检测，确保 main() 中 account_manager 等初始化完成
-        _time.sleep(10)
-
-        while True:
-            update_base_url = os.environ.get("UPDATE_CHECK_URL", "https://wb.yuuou.qzz.io")
-            if os.environ.get("DISABLE_UPDATE_CHECK", "").lower() in ("1", "true"):
-                logger.debug("更新检查已禁用 (DISABLE_UPDATE_CHECK=1)")
-            else:
-                try:
-                    import json
-                    import subprocess
-                    import urllib.request
-
-                    # 尝试获取本地 Git Commit
-                    try:
-                        local_commit = (
-                            subprocess.check_output(
-                                ["git", "rev-parse", "HEAD"], stderr=subprocess.STDOUT, cwd=_project_root
-                            )
-                            .decode("utf-8")
-                            .strip()
-                        )
-                    except Exception:
-                        local_commit = None
-
-                    req = urllib.request.Request(
-                        update_base_url,
-                        headers={"User-Agent": "WeChat-Bridge-Updater"},
-                    )
-                    with urllib.request.urlopen(req, timeout=5) as response:
-                        data = json.loads(response.read().decode())
-                        remote_commit = data.get("sha")
-
-                        if local_commit and remote_commit:
-                            if local_commit != remote_commit:
-                                logger.warning("🎉 【发现新版本】当前运行的版本较旧！")
-                                logger.warning("👉 更新方式 1 (推荐): 在项目目录下运行 'git pull' 后重启服务")
-                                logger.warning("👉 更新方式 2 (一键): 重新运行 Windows PowerShell 一键安装命令")
-                                logger.warning(
-                                    "👉 更新方式 3 (Docker): 运行 'docker compose pull && docker compose up -d'"
-                                )
-                                logger.warning("查看更新日志: https://github.com/yuuouu/WeChat-Bridge/commits/main")
-                            else:
-                                logger.info("✅ 更新检查: 当前已是最新版本")
-                        else:
-                            logger.info(
-                                "✅ 更新检查: 最新远程版本为 %s", remote_commit[:7] if remote_commit else "未知"
-                            )
-                except Exception as e:
-                    logger.debug("检测更新失败: %s", e)
-
-            # ── 可选匿名遥测（默认开启，Web 设置或 TELEMETRY_ENABLED=1 启用）──
-            current_cfg = cfg.load_config()
-            telemetry_on = os.environ.get("TELEMETRY_ENABLED", "").lower() in ("1", "true")
-            if not telemetry_on:
-                telemetry_on = bool(current_cfg.get("telemetry_enabled"))
-
-            if telemetry_on:
-                try:
-                    try:
-                        accounts_count = len(db.list_bot_accounts())
-                    except Exception:
-                        accounts_count = 0
-                    plugins_count = 0
-                    try:
-                        if account_manager is not None:
-                            runtimes = account_manager.runtimes
-                            if runtimes:
-                                first_runtime = next(iter(runtimes.values()))
-                                if hasattr(first_runtime, "bridge") and hasattr(
-                                    first_runtime.bridge, "plugin_registry"
-                                ):
-                                    plugins_count = len(first_runtime.bridge.plugin_registry.plugins)
-                    except Exception:
-                        pass
-                    if telemetry_client is not None:
-                        report_ok = telemetry_client.report(
-                            current_cfg,
-                            accounts_count,
-                            plugins_count,
-                            process_start=first_telemetry_report,
-                        )
-                        first_telemetry_report = not report_ok
-                except Exception as e:
-                    logger.debug("发送遥测失败: %s", e)
-
-            # 每 24 小时检查一次
-            _time.sleep(86400)
-
-    telemetry_client = TelemetryClient(
-        data_dir,
-        os.environ.get("UPDATE_CHECK_URL", "https://wb.yuuou.qzz.io"),
-        __version__,
-    )
-
-    import threading
-
-    threading.Thread(target=check_for_updates, daemon=True).start()
 
     # ==== 新增：注入 AI 模块 ====
     ai_manager = None

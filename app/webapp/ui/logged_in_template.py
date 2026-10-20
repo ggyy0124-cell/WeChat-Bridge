@@ -265,17 +265,6 @@ LOGGED_IN_CONTENT = """
 
     <div style="border-top: 1px solid #444; margin: 20px 0;"></div>
 
-    <h3 style="margin-bottom: 15px; font-size:15px; color:#ddd;">📊 匿名使用统计</h3>
-    <div class="form-group">
-      <div class="toggle-switch" onclick="toggleTelemetry()">
-        <div class="toggle-track on" id="telemetryToggle"><div class="toggle-knob"></div></div>
-        <span id="telemetryToggleLabel">匿名统计已开启</span>
-      </div>
-      <div style="color:#888; font-size:12px; margin-top:6px;">开启后，启动与运行时发送匿名技术指标（版本号、操作系统、架构、Python 版本、部署方式、运行天数、绑定账号数、AI提供商、插件数、Webhook状态、启用功能），帮助开发者了解兼容性需求。<strong>不含任何个人信息。</strong></div>
-    </div>
-
-    <div style="border-top: 1px solid #444; margin: 20px 0;"></div>
-
     <div style="text-align:center; color:#666; font-size:12px; line-height:1.8;">
       <a href="https://github.com/yuuouu/WeChat-Bridge" target="_blank" rel="noopener"
          style="color:#818cf8; text-decoration:none; transition:color 0.2s;"

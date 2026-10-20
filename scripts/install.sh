@@ -1,19 +1,16 @@
 #!/bin/bash
 # ============================================================
 #  WeChat Bridge — 一键安装脚本 (macOS / Linux)
-#  安装: curl -fsSL https://wb.yuuou.qzz.io/install.sh | bash
+#  安装: curl -fsSL https://raw.githubusercontent.com/ggyy0124-cell/WeChat-Bridge/main/scripts/install.sh | bash
 #  指定 pip 镜像: curl -fsSL ... | bash -s -- --mirror https://pypi.tuna.tsinghua.edu.cn/simple
 #  卸载: bash wechat-bridge/scripts/uninstall.sh
 #  卸载默认保留 data/ 目录，需手动 rm -rf wechat-bridge/data
 # ============================================================
 set -e
 
-REPO="yuuouu/WeChat-Bridge"
-CF_PROXY="https://wb.yuuou.qzz.io"
+REPO="ggyy0124-cell/WeChat-Bridge"
 INSTALL_DIR="${WECHAT_BRIDGE_DIR:-$(pwd)/wechat-bridge}"
 PORT="${WECHAT_BRIDGE_PORT:-5200}"
-DATA_DIR_EXISTED=false
-[ -d "${INSTALL_DIR}/data" ] && DATA_DIR_EXISTED=true
 
 # ── 参数解析（支持 curl ... | bash -s -- --mirror URL）──
 PIP_MIRROR="${PIP_MIRROR:-}"
@@ -60,58 +57,35 @@ fi
 
 info "安装方式: $([[ $MODE == docker ]] && echo 'Docker Compose' || echo '原生 Python')"
 
-# ── 从 CF 代理下载源码 ──
-download_from_proxy() {
-  info "正在通过 CDN 代理下载源码..."
-  mkdir -p "${INSTALL_DIR}"
-  curl -fsSL "${CF_PROXY}/archive/main.tar.gz" | tar xz --strip-components=1 -C "${INSTALL_DIR}"
-}
-
 # ── 从 GitHub 直接下载源码包 ──
 download_from_github() {
   info "正在从 GitHub 下载源码包..."
   mkdir -p "${INSTALL_DIR}"
   curl -fsSL "https://github.com/${REPO}/archive/refs/heads/main.tar.gz" \
-    | tar xz --strip-components=1 -C "${INSTALL_DIR}"
+    | tar xz --strip-components=1 -C "${INSTALL_DIR}" \
+    || error "下载失败，请检查网络是否能访问 GitHub (https://github.com/${REPO})"
 }
-
-# ── GitHub 探针（3 秒超时）──
-GITHUB_OK=false
-if curl -fsS --max-time 3 -o /dev/null "https://github.com/${REPO}" 2>/dev/null; then
-  GITHUB_OK=true
-  info "GitHub 直连可用"
-else
-  warn "GitHub 直连不可达，将使用 CDN 代理"
-fi
 
 # ── 克隆/下载代码 ──
 if [ -d "${INSTALL_DIR}/.git" ]; then
   warn "目录已存在，正在更新..."
   cd "${INSTALL_DIR}" && git pull --ff-only || {
-    warn "git pull 失败，回退到 CDN 代理覆盖式下载..."
+    warn "git pull 失败，回退到覆盖式下载..."
     cd - >/dev/null
-    download_from_proxy
+    download_from_github
   }
-elif $GITHUB_OK && command -v git &>/dev/null; then
+elif command -v git &>/dev/null; then
   info "正在从 GitHub 克隆仓库..."
   git clone --depth 1 "https://github.com/${REPO}.git" "${INSTALL_DIR}" 2>/dev/null || {
-    warn "git clone 失败，回退到 CDN 代理下载..."
-    download_from_proxy
-  }
-elif $GITHUB_OK; then
-  download_from_github || {
-    warn "下载失败，回退到 CDN 代理覆盖式下载..."
-    download_from_proxy
+    warn "git clone 失败，回退到源码包下载..."
+    download_from_github
   }
 else
-  download_from_proxy
+  download_from_github
 fi
 
 cd "${INSTALL_DIR}"
 mkdir -p data
-if ! $DATA_DIR_EXISTED; then
-  printf '%s\n' "$MODE" > data/.install_pending
-fi
 info "安装目录: ${INSTALL_DIR}"
 
 if [[ "$MODE" == "docker" ]]; then

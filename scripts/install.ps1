@@ -1,18 +1,16 @@
 # ============================================================
 #  WeChat Bridge - Windows Installer
-#  Install:   powershell -c "irm https://wb.yuuou.qzz.io/install.ps1 | iex"
+#  Install:   powershell -c "irm https://raw.githubusercontent.com/ggyy0124-cell/WeChat-Bridge/main/scripts/install.ps1 | iex"
 #  Mirror:    $env:PIP_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple"; irm ... | iex
 #  Uninstall: powershell -ExecutionPolicy Bypass -File wechat-bridge\scripts\uninstall.ps1
 #  卸载默认保留 data\ 目录，需手动 Remove-Item -Recurse -Force wechat-bridge\data
 # ============================================================
 
 $ErrorActionPreference = "Continue"
-$REPO = "yuuouu/WeChat-Bridge"
-$CF_PROXY = "https://wb.yuuou.qzz.io"
+$REPO = "ggyy0124-cell/WeChat-Bridge"
 if ($env:WECHAT_BRIDGE_DIR) { $INSTALL_DIR = $env:WECHAT_BRIDGE_DIR } else { $INSTALL_DIR = Join-Path (Get-Location) "wechat-bridge" }
 if ($env:WECHAT_BRIDGE_PORT) { $PORT = $env:WECHAT_BRIDGE_PORT } else { $PORT = "5200" }
 if ($env:PIP_MIRROR) { $PIP_MIRROR = $env:PIP_MIRROR } else { $PIP_MIRROR = "" }
-$dataDirExisted = Test-Path (Join-Path $INSTALL_DIR "data")
 
 function Write-Info  { param($msg) Write-Host "  [OK] $msg" -ForegroundColor Green }
 function Write-Warn  { param($msg) Write-Host "  [!] $msg" -ForegroundColor Yellow }
@@ -63,23 +61,6 @@ Write-Info ("Python: " + $pyVer.Trim())
 # ── 2. Download code ──
 $hasGit = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
 
-function Download-FromProxy {
-    Write-Info "Downloading source via CDN proxy..."
-    $zipUrl = $CF_PROXY + "/archive/main.zip"
-    $zipFile = Join-Path $env:TEMP "wechat-bridge.zip"
-    try {
-        Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
-    } catch {
-        Write-Err "Download failed. Check your network connection."
-    }
-    New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
-    $extracted = Join-Path $env:TEMP "WeChat-Bridge-main"
-    Remove-Item $extracted -Recurse -Force -ErrorAction SilentlyContinue
-    Expand-Archive -Path $zipFile -DestinationPath $env:TEMP -Force
-    Get-ChildItem -Path $extracted | Copy-Item -Destination $INSTALL_DIR -Recurse -Force
-    Remove-Item $zipFile, $extracted -Recurse -Force -ErrorAction SilentlyContinue
-}
-
 function Download-FromGitHub {
     Write-Info "Downloading source from GitHub..."
     $zipUrl = "https://github.com/$REPO/archive/refs/heads/main.zip"
@@ -87,9 +68,7 @@ function Download-FromGitHub {
     try {
         Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
     } catch {
-        Write-Warn "GitHub download failed, falling back to CDN proxy..."
-        Download-FromProxy
-        return
+        Write-Err "Download failed. Check that GitHub is reachable: https://github.com/$REPO"
     }
     New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
     $extracted = Join-Path $env:TEMP "WeChat-Bridge-main"
@@ -97,16 +76,6 @@ function Download-FromGitHub {
     Expand-Archive -Path $zipFile -DestinationPath $env:TEMP -Force
     Get-ChildItem -Path $extracted | Copy-Item -Destination $INSTALL_DIR -Recurse -Force
     Remove-Item $zipFile, $extracted -Recurse -Force -ErrorAction SilentlyContinue
-}
-
-# ── GitHub Probe (3s timeout) ──
-$githubOk = $false
-try {
-    $null = Invoke-WebRequest -Uri "https://github.com/$REPO" -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-    $githubOk = $true
-    Write-Info "GitHub direct connection available"
-} catch {
-    Write-Warn "GitHub unreachable, using CDN proxy"
 }
 
 $isGitRepo = (Test-Path $INSTALL_DIR) -and (Test-Path (Join-Path $INSTALL_DIR ".git"))
@@ -123,23 +92,20 @@ if ($isGitRepo) {
     else {
         Write-Warn ("git pull failed, re-downloading...")
         Pop-Location
-        Download-FromProxy
+        Download-FromGitHub
     }
     if ((Get-Location).Path -eq $INSTALL_DIR) { Pop-Location }
 }
-elseif ($githubOk -and $hasGit) {
+elseif ($hasGit) {
     Write-Info "Cloning from GitHub..."
     $cloneResult = & git clone --depth 1 ("https://github.com/" + $REPO + ".git") $INSTALL_DIR 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "Git clone failed, falling back to CDN proxy..."
-        Download-FromProxy
+        Write-Warn "Git clone failed, falling back to source archive download..."
+        Download-FromGitHub
     }
 }
-elseif ($githubOk) {
-    Download-FromGitHub
-}
 else {
-    Download-FromProxy
+    Download-FromGitHub
 }
 
 Write-Info ("Install directory: " + $INSTALL_DIR)
@@ -147,9 +113,6 @@ Write-Info ("Install directory: " + $INSTALL_DIR)
 # ── 3. Install dependencies ──
 Push-Location $INSTALL_DIR
 New-Item -ItemType Directory -Force -Path "data" | Out-Null
-if (-not $dataDirExisted) {
-    Set-Content -Path (Join-Path "data" ".install_pending") -Value "windows" -Encoding ASCII
-}
 
 Write-Host "  [..] Installing Python dependencies..." -ForegroundColor DarkGray -NoNewline
 $pipArgs = @("-m", "pip", "install", "-q", "-r", "app/requirements.txt")

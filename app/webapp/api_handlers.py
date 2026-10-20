@@ -1041,7 +1041,6 @@ def handle_post_ai_config(handler, ctx, params, body):
         "webhook_url",
         "webhook_mode",
         "webhook_timeout",
-        "telemetry_enabled",
     ):
         if key in data:
             current[key] = data[key]

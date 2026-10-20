@@ -13,7 +13,6 @@ LOGGED_IN_JS = r"""
     };
     let aiEnabled = false;
     let webhookEnabled = false;
-    let telemetryEnabled = true;
     let keepaliveMinutes = 0;
     let currentBotId = localStorage.getItem('currentBotId') || '';
     let accounts = [];
@@ -115,12 +114,6 @@ LOGGED_IN_JS = r"""
       document.getElementById('aiSettingsGroup').style.display = aiEnabled ? 'block' : 'none';
     }
 
-    function toggleTelemetry() {
-      telemetryEnabled = !telemetryEnabled;
-      document.getElementById('telemetryToggle').classList.toggle('on', telemetryEnabled);
-      document.getElementById('telemetryToggleLabel').textContent = telemetryEnabled ? '匿名统计已开启' : '匿名统计已关闭';
-    }
-
     function toggleWebhook() {
       webhookEnabled = !webhookEnabled;
       document.getElementById('webhookToggle').classList.toggle('on', webhookEnabled);
@@ -171,10 +164,6 @@ LOGGED_IN_JS = r"""
         document.getElementById('webhookToggle').classList.toggle('on', webhookEnabled);
         document.getElementById('webhookToggleLabel').textContent = webhookEnabled ? 'Webhook 已启用' : 'Webhook 已关闭';
         document.getElementById('webhookSettingsGroup').style.display = webhookEnabled ? 'block' : 'none';
-
-        telemetryEnabled = !!cfg.telemetry_enabled;
-        document.getElementById('telemetryToggle').classList.toggle('on', telemetryEnabled);
-        document.getElementById('telemetryToggleLabel').textContent = telemetryEnabled ? '匿名统计已开启' : '匿名统计已关闭';
 
         setKAFromMinutes(cfg.keepalive_remind_minutes || 0);
 
@@ -244,7 +233,6 @@ LOGGED_IN_JS = r"""
         webhook_url: document.getElementById('webhookUrl').value.trim(),
         webhook_mode: document.getElementById('webhookMode').value,
         webhook_timeout: parseInt(document.getElementById('webhookTimeout').value) || 5,
-        telemetry_enabled: telemetryEnabled,
       };
       if (cfg.webhook_enabled && !cfg.webhook_url) {
         showToast('请先填写 Webhook 地址', 'error');

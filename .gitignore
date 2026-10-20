@@ -3,9 +3,6 @@ data-token.json
 *.token
 .env
 
-# === 本地专属配置（包含本机路径，不入库）===
-examples/project_map.json
-
 # === 个人化 examples（私有同步到 Obsidian）===
 /personal-plugins/
 examples/private/

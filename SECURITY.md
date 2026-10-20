@@ -21,7 +21,7 @@ WeChat Bridge can send messages through your WeChat account. Treat the HTTP API 
 - Avoid placing tokens in URLs. `Authorization: Bearer <TOKEN>` is preferred over `?token=<TOKEN>` because URLs are commonly stored in logs, browser history, and proxy analytics.
 - Do not expose `/data` or backup archives. They contain login credentials, message history, contacts, and runtime configuration.
 - Restrict access with firewall rules, reverse-proxy authentication, IP allowlists, VPN, or Cloudflare Access when deployed on the public internet.
-- Keep `docker-compose.yml` minimal for public deployments. Put personal mounts, private network addresses, AI CLI credentials, and proxy settings in an untracked override file.
+- Keep `docker-compose.yml` minimal for public deployments. Put personal mounts, private network addresses, and proxy settings in an untracked override file.
 - Rotate `API_TOKEN` immediately if it appears in logs, screenshots, chat history, shell history, or a committed file.
 - Back up `/data` securely before upgrading, and validate that backups are not publicly downloadable.
 - Review plugins before enabling them. Plugins can receive message content and may call external services.

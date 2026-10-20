@@ -71,5 +71,19 @@ class PluginRegistryTests(unittest.TestCase):
         self.assertEqual(plugin.errors, [("private detail", "handle")])
 
 
+class BundledExamplesTests(unittest.TestCase):
+    def test_bundled_plugins_load_without_remote_cli_commands(self):
+        """内置示例仍可正常加载，且不再提供通过微信远程驱动本机 AI CLI 的命令。"""
+        registry = PluginRegistry(EventBus())
+        webhook_manager.discover_and_register_plugins(registry)
+
+        names = {plugin.name for plugin in registry.plugins}
+        commands = {cmd for plugin in registry.plugins for cmd in plugin.commands}
+
+        self.assertTrue(names, "内置示例插件应当能被发现并加载")
+        self.assertNotIn("bridge-code-agent", names)
+        self.assertEqual({"/code", "/switch", "/cli"} & commands, set())
+
+
 if __name__ == "__main__":
     unittest.main()

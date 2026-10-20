@@ -21,7 +21,6 @@ WeChat Bridge 使用 HTTP API 把服务器、NAS 和自动化服务的通知发�
 - [通过 HTTP API 发送微信消息](docs/api-reference.md)：接口参数、鉴权与调用示例
 - [通过 Webhook 接收微信消息并异步回写](docs/webhook-async-reply.md)：双向消息流程与调试
 - [使用 Docker 或安装脚本部署微信 Bot](docs/deployment.md)：部署、升级与管理
-- [通过微信远程操控 AI CLI](docs/bridge-code-agent.md)：Gemini、Claude Code 与 Codex
 
 ---
 
@@ -159,22 +158,6 @@ curl "https://bot.example.com/api/send?token=change-this-token&to=好友名称&t
 
 ---
 
-## 通过微信远程操控 AI CLI
-
-在手机微信里向 Bot 发指令，即可驱动运行在电脑上的 AI CLI（Gemini / Claude Code / Codex）执行代码分析、单测生成、架构问答等任务——无需远程连接电脑，随时随地进行代码审查。直接向 Bot 发消息，AI CLI 在电脑上执行，结果实时回传微信
-
-- `/code <项目名>` 进入指定项目的 AI 会话，Bot 立即回传"已进入"确认
-- `/switch gemini / claude / codex` 随时切换 AI 后端，session 自动重置
-- `/exit` 关闭会话
-
-<div align="center">
-  <img src="docs/assets/code-agent.png" alt="通过微信远程操控 AI CLI 示例" width="360">
-</div>
-
-详见 [Bridge Code Agent](docs/bridge-code-agent.md)
-
----
-
 ## 核心能力
 
 - **标准 HTTP API**：`/api/send`、`/api/send_image`、`/api/push`、`/api/webhook`、`/api/ai_analyze`、`/api/contacts`、`/api/status`
@@ -299,7 +282,6 @@ WeChat Bridge 基于腾讯 iLink Bot API，无法绕过官方接口限制：
 | [异步回写集成指南](docs/webhook-async-reply.md) | 外部 Webhook 接入流程与调试建议 |
 | [Webhook 示例](docs/webhook-examples.md) | 会话式插件与无状态命令示例 |
 | [插件开发指南](docs/plugin-development.md) | 插件接口、manifest、生命周期与安全要求 |
-| [Bridge Code Agent](docs/bridge-code-agent.md) | 通过微信远程操控电脑上的 AI CLI（Gemini / Claude / Codex） |
 | [工作原理](docs/architecture.md) | iLink 协议桥接时序图与核心流程解析 |
 | [安全策略](SECURITY.md) | 漏洞报告方式与部署安全清单 |
 | [更新日志](docs/CHANGELOG.md) | 版本变更记录 |

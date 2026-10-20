@@ -120,4 +120,3 @@ examples/session-notes/
 
 - [`examples/webhook_receiver.py`](../examples/webhook_receiver.py)：适合 `/天气 深圳`、`/echo` 这类无状态命令
 - [`examples/forwarder.py`](../examples/forwarder.py)：把所有入站消息转发到 `FORWARD_URLS`
-- [`examples/bridge_code_agent.py`](../examples/bridge_code_agent.py)：通过微信远程驱动 AI CLI

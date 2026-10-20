@@ -9,7 +9,6 @@
 | `webhook_receiver.py` | 无状态命令插件，包含 `/天气 城市` 和 `/echo 文本` 示例 |
 | `session_notes.py` | 有状态会话插件，演示 `/note` 开始、普通消息收集、`/exit` 结束 |
 | `forwarder.py` | 入站消息转发插件，通过 `FORWARD_URLS` 指定一个或多个目标 URL |
-| `bridge_code_agent.py` | 通过微信远程驱动 Gemini / Claude Code / Codex 等 AI CLI |
 | `bridge_book_download.py` | 搜索书目、下载 Project Gutenberg 公版书，并把自有电子书提交到 CWA |
 
 ## 使用方式

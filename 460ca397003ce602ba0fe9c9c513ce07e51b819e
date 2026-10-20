@@ -1,0 +1,23 @@
+tests/test_plugins.py
+  s_f06740b499b367::t_d59966b56beefc 74-87
+SECURITY.md
+  s_f06740b499b367::t_43b94a1cb41ba4 24
+docs/deployment.md
+  s_f06740b499b367::t_01dcd0e092976a 98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "460ca397003ce602ba0fe9c9c513ce07e51b819e",
+  "prompts": {},
+  "sessions": {
+    "s_f06740b499b367": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "22e68205-ff73-4aa5-b821-5dd6d3d06fde",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "luonian <luonian0124@gmail.com>"
+    }
+  }
+}

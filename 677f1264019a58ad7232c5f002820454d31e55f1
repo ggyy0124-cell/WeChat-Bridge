@@ -1,0 +1,40 @@
+tests/test_config.py
+  s_f06740b499b367::t_654e82c955bd41 4
+  s_f06740b499b367::t_b31f769630345a 178-207
+scripts/install.sh
+  s_f06740b499b367::t_1b946019fb160d 4,11
+  s_f06740b499b367::t_b5592ff8ebde69 65-66,73,75,77,80-81,84
+docs/deployment.md
+  s_f06740b499b367::t_1d359c828ffab0 120
+tests/test_webapp_server.py
+  s_f06740b499b367::t_ad63772e97e1d6 651-668
+app/config.py
+  s_f06740b499b367::t_55f6069222b34b 116-117
+scripts/install.ps1
+  s_f06740b499b367::t_9057a689f14c30 71
+  s_f06740b499b367::t_f451bd5eed2f25 95,99,103-104,108
+  s_f06740b499b367::t_78d7b71c50d33e 10
+  s_f06740b499b367::t_2d66ff06dba27c 3
+README.md
+  s_f06740b499b367::t_5671ea7880b24a 39
+  s_f06740b499b367::t_0f0e5e3d033a75 33
+  s_f06740b499b367::t_1ed419ae25ef36 311-317
+tests/test_webapp_ui.py
+  s_f06740b499b367::t_c01c950a96f3fc 34-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "677f1264019a58ad7232c5f002820454d31e55f1",
+  "prompts": {},
+  "sessions": {
+    "s_f06740b499b367": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "22e68205-ff73-4aa5-b821-5dd6d3d06fde",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "luonian <luonian0124@gmail.com>"
+    }
+  }
+}

@@ -1,13 +1,13 @@
 [project]
 name = "wechat-bridge"
-version = "1.4.0"
+version = "1.4.0+0.1"  # PEP 440 本地版本写法，对应发布版本 v1.4.0-0.1（基于上游 1.4.0 的下游修订 0.1）
 requires-python = ">=3.10"
 
 [project.urls]
-Homepage = "https://wg.yuuou.qzz.io/"
-Documentation = "https://github.com/yuuouu/WeChat-Bridge/tree/main/docs"
-Repository = "https://github.com/yuuouu/WeChat-Bridge"
-Issues = "https://github.com/yuuouu/WeChat-Bridge/issues"
+Homepage = "https://github.com/ggyy0124-cell/WeChat-Bridge"
+Documentation = "https://github.com/ggyy0124-cell/WeChat-Bridge/tree/main/docs"
+Repository = "https://github.com/ggyy0124-cell/WeChat-Bridge"
+Issues = "https://github.com/ggyy0124-cell/WeChat-Bridge/issues"
 
 [tool.ruff]
 target-version = "py310"

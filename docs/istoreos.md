@@ -1,6 +1,6 @@
 # iStoreOS 安装与使用
 
-WeChat Bridge 的 iStoreOS 版本采用 Docker 管理型打包：LuCI 插件负责配置、拉取镜像、启停容器和日志入口，应用主体运行在 `ghcr.io/yuuouu/wechat-bridge` 容器中。
+WeChat Bridge 的 iStoreOS 版本采用 Docker 管理型打包：LuCI 插件负责配置、拉取镜像、启停容器和日志入口，应用主体运行在 `ghcr.io/ggyy0124-cell/wechat-bridge` 容器中。
 
 ## 安装
 
@@ -15,7 +15,7 @@ $ISTORE_CONF_DIR/WeChatBridge
 - `启用`：打开后会创建并启动容器。
 - `Web 端口`：默认 `5200`。
 - `数据目录`：iStore 自动配置为 `WeChatBridge` 数据目录。
-- `镜像名`：默认 `ghcr.io/yuuouu/wechat-bridge`。
+- `镜像名`：默认 `ghcr.io/ggyy0124-cell/wechat-bridge`。
 - `镜像 Tag`：默认 `latest`，需要固定版本时可改为具体 tag。
 - `API Token`：Web 面板和 API 调用的访问密钥。
 - `Markdown 模式`：默认 `markdown`，通知整理可选 `normalize`，纯文本可选 `plain`。

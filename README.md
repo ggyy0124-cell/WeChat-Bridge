@@ -8,13 +8,21 @@
 
 **轻量 · 数据主权 · 跨平台开箱即用**
 
-[项目官网](https://wg.yuuou.qzz.io/) · [API 文档](docs/api-reference.md) · [部署指南](docs/deployment.md)
+[API 文档](docs/api-reference.md) · [部署指南](docs/deployment.md) · [上游项目](https://github.com/yuuouu/WeChat-Bridge)
 
 <img src="docs/assets/banner.png" alt="WeChat Bridge" width="240">
 
 </div>
 
 ---
+
+> **关于本分支**：本仓库 fork 自 [yuuouu/WeChat-Bridge](https://github.com/yuuouu/WeChat-Bridge)（MIT License），基于上游 v1.4.0 维护。版本号形如 `v1.4.0-0.1`，即「上游版本号 - 本分支修订号」。与上游相比：
+>
+> - 移除遥测、匿名统计以及启动时的版本检查，不再向任何统计服务发送请求
+> - 移除「通过微信远程操控 AI CLI」（Bridge Code Agent）模块
+> - 安装脚本、Docker 镜像和文档均指向本仓库
+>
+> 完整变更见 [更新日志](docs/CHANGELOG.md)。
 
 WeChat Bridge 使用 HTTP API 把服务器、NAS 和自动化服务的通知发送到微信，也能通过 Webhook 把微信消息交给外部服务处理。
 
@@ -46,7 +54,7 @@ mkdir -p wechat-bridge && cd wechat-bridge
 cat > docker-compose.yml <<EOF
 services:
   wechat-bridge:
-    image: ghcr.io/yuuouu/wechat-bridge:latest
+    image: ghcr.io/ggyy0124-cell/wechat-bridge:latest
     container_name: wechat-bridge
     restart: unless-stopped
     ports:

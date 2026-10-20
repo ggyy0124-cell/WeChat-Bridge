@@ -45,7 +45,7 @@ wechat-bridge/
 
 ### 1. 找到要做的事
 
-- 查看 [Issues](https://github.com/yuuouu/wechat-bridge/issues) 列表
+- 查看 [Issues](https://github.com/ggyy0124-cell/wechat-bridge/issues) 列表
 - 标有 `good first issue` 的适合新手
 - 如果要做大的改动，请先开 Issue 讨论
 
@@ -69,7 +69,7 @@ wechat-bridge/
 
 ## 🐛 报告 Bug
 
-请通过 [Issue](https://github.com/yuuouu/wechat-bridge/issues/new) 提交，包含：
+请通过 [Issue](https://github.com/ggyy0124-cell/wechat-bridge/issues/new) 提交，包含：
 
 1. 问题描述
 2. 复现步骤

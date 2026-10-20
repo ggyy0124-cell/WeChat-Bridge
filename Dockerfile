@@ -1,6 +1,6 @@
 FROM python:3.11-alpine
 
-LABEL org.opencontainers.image.source="https://github.com/yuuouu/wechat-bridge"
+LABEL org.opencontainers.image.source="https://github.com/ggyy0124-cell/wechat-bridge"
 LABEL org.opencontainers.image.description="WeChat message bridge based on iLink Bot API"
 LABEL org.opencontainers.image.licenses="MIT"
 

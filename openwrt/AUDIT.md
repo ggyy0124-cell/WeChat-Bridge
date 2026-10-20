@@ -22,10 +22,10 @@ checkout, Lua compiler, and iStoreOS/OpenWrt runtime device.
 | App API surface used by docs | Verifier directly exercises `/api/status`, `/api/send` Bearer auth, query-token auth, and unauthorized `/api/send` against app handlers when `python3` is available. | Satisfied locally |
 | Add SDK build docs | `openwrt/README.md` covers Docker dependency confirmation, feed-search commands, strict verifier examples, IPK build, test-machine validation, app-meta submission, and upstream order; verifier checks key commands. | Satisfied |
 | Docker-managed runtime, not native Python OpenWrt package | `istorec/wechat-bridge.sh` manages Docker pull/run/start/stop/restart; no Python OpenWrt packaging files were added. | Satisfied |
-| GHCR multi-arch image source | `.github/workflows/docker-publish.yml` builds and pushes `${{ github.repository }}` to `ghcr.io` for `linux/amd64,linux/arm64`, matching `ghcr.io/yuuouu/wechat-bridge`; live registry availability still requires registry/device validation. | Partially verified |
+| GHCR multi-arch image source | `.github/workflows/docker-publish.yml` builds and pushes `${{ github.repository }}` to `ghcr.io` for `linux/amd64,linux/arm64`, matching `ghcr.io/ggyy0124-cell/wechat-bridge`; live registry availability still requires registry/device validation. | Partially verified |
 | Runtime script entrypoints executable | Verifier checks executable bits for `istorec/wechat-bridge.sh`, `uci-defaults/99-wechat-bridge`, and app-meta `config.sh`. | Satisfied |
 | First release arch: `x86_64 aarch64` | `openwrt/app-meta-wechat-bridge/Makefile` has `META_ARCH:=x86_64 aarch64`. | Satisfied |
-| Image defaults | UCI defaults and scripts use `ghcr.io/yuuouu/wechat-bridge:latest`. | Satisfied |
+| Image defaults | UCI defaults and scripts use `ghcr.io/ggyy0124-cell/wechat-bridge:latest`. | Satisfied |
 | Container name `wechat-bridge` | `istorec/wechat-bridge.sh` sets `CONTAINER="wechat-bridge"`. | Satisfied |
 | Default Web port `5200` | UCI default, `config.sh`, and `istorec` fallback use `5200`. | Satisfied |
 | Default iStore data path | `config.sh path` writes `$ISTORE_CONF_DIR/WeChatBridge`; verified by fake UCI check. | Satisfied |

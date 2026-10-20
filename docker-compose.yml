@@ -1,6 +1,6 @@
 services:
   wechat-bridge:
-    image: ghcr.io/yuuouu/wechat-bridge:latest
+    image: ghcr.io/ggyy0124-cell/wechat-bridge:latest
     container_name: wechat-bridge
     restart: unless-stopped
     ports:

@@ -28,7 +28,7 @@ set_default() {
 ensure_section
 set_default enabled 0
 set_default port 5200
-set_default image_name ghcr.io/yuuouu/wechat-bridge
+set_default image_name ghcr.io/ggyy0124-cell/wechat-bridge
 set_default image_tag latest
 set_default markdown_mode markdown
 set_default webhook_port 18082

@@ -73,7 +73,7 @@ config_path.placeholder = "/mnt/your-disk/istore/WeChatBridge"
 config_path.rmempty = false
 
 image_name = s:option(Value, "image_name", translate("Image Name"))
-image_name.default = "ghcr.io/yuuouu/wechat-bridge"
+image_name.default = "ghcr.io/ggyy0124-cell/wechat-bridge"
 image_name.rmempty = false
 
 image_tag = s:option(Value, "image_tag", translate("Image Tag"))

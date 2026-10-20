@@ -266,10 +266,10 @@ LOGGED_IN_CONTENT = """
     <div style="border-top: 1px solid #444; margin: 20px 0;"></div>
 
     <div style="text-align:center; color:#666; font-size:12px; line-height:1.8;">
-      <a href="https://github.com/yuuouu/WeChat-Bridge" target="_blank" rel="noopener"
+      <a href="https://github.com/ggyy0124-cell/WeChat-Bridge" target="_blank" rel="noopener"
          style="color:#818cf8; text-decoration:none; transition:color 0.2s;"
          onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">
-        github.com/yuuouu/WeChat-Bridge
+        github.com/ggyy0124-cell/WeChat-Bridge
       </a><br>
       <span style="color:#555; font-size:11px;">基于 iLink Bot API · MIT License</span>
     </div>

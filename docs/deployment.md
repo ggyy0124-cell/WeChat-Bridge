@@ -8,7 +8,7 @@
 
 ## 🤖 让 AI 帮你部署
 直接把下面这句话发给你正在使用的 AI 助手（如 Cursor, Cline 等）：
-> `@workspace 请根据我的操作系统，直接执行 https://github.com/yuuouu/WeChat-Bridge 的一键安装脚本帮我部署 WeChat Bridge`
+> `@workspace 请根据我的操作系统，直接执行 https://github.com/ggyy0124-cell/WeChat-Bridge 的一键安装脚本帮我部署 WeChat Bridge`
 
 ---
 
@@ -18,14 +18,14 @@
 
 下载地址：
 
-- GitHub ZIP：`https://github.com/yuuouu/WeChat-Bridge/archive/refs/heads/main.zip`
+- GitHub ZIP：`https://github.com/ggyy0124-cell/WeChat-Bridge/archive/refs/heads/main.zip`
 
 如果使用浏览器下载，下载完成后解压，将解压出的 `WeChat-Bridge-main` 文件夹重命名为 `wechat-bridge`，然后进入该目录执行启动脚本。
 
 **macOS / Linux：**
 
 ```bash
-curl -L -o wechat-bridge.zip https://github.com/yuuouu/WeChat-Bridge/archive/refs/heads/main.zip
+curl -L -o wechat-bridge.zip https://github.com/ggyy0124-cell/WeChat-Bridge/archive/refs/heads/main.zip
 unzip wechat-bridge.zip
 mv WeChat-Bridge-main wechat-bridge
 cd wechat-bridge
@@ -37,7 +37,7 @@ bash scripts/start.sh
 **Windows PowerShell：**
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/yuuouu/WeChat-Bridge/archive/refs/heads/main.zip" -OutFile "wechat-bridge.zip"
+Invoke-WebRequest -Uri "https://github.com/ggyy0124-cell/WeChat-Bridge/archive/refs/heads/main.zip" -OutFile "wechat-bridge.zip"
 Expand-Archive -Path "wechat-bridge.zip" -DestinationPath "." -Force
 Rename-Item -Path ".\WeChat-Bridge-main" -NewName "wechat-bridge"
 cd .\wechat-bridge
@@ -55,7 +55,7 @@ scripts\start.bat
 只需 Python 3.10+：
 
 ```bash
-git clone https://github.com/yuuouu/WeChat-Bridge.git
+git clone https://github.com/ggyy0124-cell/WeChat-Bridge.git
 cd WeChat-Bridge
 pip install -r app/requirements.txt
 cd app && python main.py
@@ -71,7 +71,7 @@ mkdir -p wechat-bridge && cd wechat-bridge
 cat > docker-compose.yml <<EOF
 services:
   wechat-bridge:
-    image: ghcr.io/yuuouu/wechat-bridge:latest
+    image: ghcr.io/ggyy0124-cell/wechat-bridge:latest
     container_name: wechat-bridge
     restart: unless-stopped
     ports:

@@ -50,7 +50,7 @@ if [ "$want_enable" = "1" ]; then
 fi
 
 set_default port 5200
-set_default image_name ghcr.io/yuuouu/wechat-bridge
+set_default image_name ghcr.io/ggyy0124-cell/wechat-bridge
 set_default image_tag latest
 set_default markdown_mode markdown
 

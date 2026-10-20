@@ -4,15 +4,27 @@
 
 ## [Unreleased]
 
-### Added
-- 匿名心跳新增按日/按周轮换的去重标识，支持精确 DAU / WAU，并区分进程启动、首次观测、安装成功和升级事件
-- 新增 Cloudflare D1 建表迁移和部署文档
+## [1.4.0-0.1] - 2026-10-20
+
+基于上游 [yuuouu/WeChat-Bridge](https://github.com/yuuouu/WeChat-Bridge) v1.4.0 的下游分支首个版本，版本号格式为「上游版本号 - 本分支修订号」。
+
+### Removed
+- 移除遥测与匿名使用统计：删除 `app/telemetry.py`，不再发送启动、心跳、首次观测、安装成功和升级事件；删除 Web 管理端的「匿名使用统计」开关与 `telemetry_enabled` 配置项（旧配置文件中残留的该字段会在加载时被丢弃）
+- 移除启动时的版本检查：程序不再向作者的统计服务发起任何请求，环境变量 `TELEMETRY_ENABLED`、`UPDATE_CHECK_URL`、`DISABLE_UPDATE_CHECK` 不再生效
+- 移除 Cloudflare D1 统计相关内容：D1 建表迁移、部署文档与 Worker 下载代理示例
+- 移除安装脚本中的第三方 CDN 代理回退和安装计数标记（`data/.install_pending`），安装脚本只从本仓库的 GitHub 地址下载
+- 移除 Bridge Code Agent（通过微信远程操控本机 Gemini / Claude Code / Codex CLI）：删除 `examples/bridge_code_agent.py`、`project_map.json.example` 和配套文档，`/code`、`/switch`、`/cli` 命令不再提供
 
 ### Changed
-- 匿名统计、DAU / WAU、事件和下载计数从 Workers KV 迁移到 D1；KV 仅保留 GitHub 版本响应缓存
+- 安装脚本、Docker 镜像（`ghcr.io/ggyy0124-cell/wechat-bridge`）、iStoreOS / OpenWrt 默认镜像、README 与部署文档均改为指向本仓库
+- 应用版本号为 `1.4.0-0.1`；`pyproject.toml` 中按 PEP 440 记为 `1.4.0+0.1`
 
-### Fixed
-- 存储写入失败时返回 `503`，避免客户端把未落库的安装或升级事件误标为已送达
+### Upgrade notes
+- 升级后可手动删除 `data/` 目录下遗留的 `.telemetry_state.json` 与 `.install_pending`，它们不会再被读取
+- 原 Code Agent 的 `examples/project_map.json`，以及 `GEMINI_TIMEOUT`、`ALLOWED_USERS`、`DEFAULT_BACKEND`、`CLAUDE_NONROOT_USER` 等环境变量不再使用；`SESSION_TIMEOUT_MINUTES` 仍用于会话式便签插件
+- 程序不再检查更新，请关注本仓库的 [Releases](https://github.com/ggyy0124-cell/WeChat-Bridge/releases)
+
+---
 
 ## [1.4.0] - 2026-10-06
 

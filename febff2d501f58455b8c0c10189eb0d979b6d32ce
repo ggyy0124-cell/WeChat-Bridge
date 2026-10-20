@@ -1,0 +1,60 @@
+openwrt/app-meta-wechat-bridge/Makefile
+  s_f06740b499b367::t_88f6d44cc35996 12-13
+openwrt/verify-istoreos-package.sh
+  s_f06740b499b367::t_9a1b0ff827d1cd 392
+  s_f06740b499b367::t_1885c78551ac55 117
+  s_f06740b499b367::t_7d11a26cd54887 171-172
+openwrt/luci-app-wechat-bridge/root/etc/uci-defaults/99-wechat-bridge
+  s_f06740b499b367::t_fc2dc386097630 31
+openwrt/luci-app-wechat-bridge/root/usr/libexec/istorec/wechat-bridge.sh
+  s_f06740b499b367::t_68d294b647c24e 7
+.github/CONTRIBUTING.md
+  s_f06740b499b367::t_5ab5b4ad266136 48,72
+openwrt/app-meta-wechat-bridge/config.sh
+  s_f06740b499b367::t_1b504f57f4afb7 53
+pyproject.toml
+  s_f06740b499b367::t_ebbe7d1abdcab2 3,7-10
+Dockerfile
+  s_f06740b499b367::t_678be88127eaeb 3
+README.md
+  s_f06740b499b367::t_41c1a23fab8d22 19-26
+  s_f06740b499b367::t_0b5de9e88a340b 57
+  s_f06740b499b367::t_703a0f84b08396 11
+tests/test_ilink.py
+  s_f06740b499b367::t_5d2e06b154fbec 184
+docker-compose.yml
+  s_f06740b499b367::t_457a8e7207e113 3
+openwrt/luci-app-wechat-bridge/root/etc/config/wechat-bridge
+  s_f06740b499b367::t_8fa835a97100f4 5
+app/version.py
+  s_f06740b499b367::t_b881df2e30f88b 5
+docs/deployment.md
+  s_f06740b499b367::t_bfee921a7a31e7 74
+  s_f06740b499b367::t_c72438b5977eee 11,21,28,40,58
+openwrt/luci-app-wechat-bridge/luasrc/model/cbi/wechat-bridge.lua
+  s_f06740b499b367::t_a910ef07df68a2 76
+docs/istoreos.md
+  s_f06740b499b367::t_0e3167ea41c1a5 3,18
+docs/CHANGELOG.md
+  s_f06740b499b367::t_05b1195e6ecf3f 7-16,19-25,27
+openwrt/AUDIT.md
+  s_f06740b499b367::t_f1fe2a56dafd22 25,28
+app/webapp/ui/logged_in_template.py
+  s_f06740b499b367::t_12b50b17f55544 269,272
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "febff2d501f58455b8c0c10189eb0d979b6d32ce",
+  "prompts": {},
+  "sessions": {
+    "s_f06740b499b367": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "22e68205-ff73-4aa5-b821-5dd6d3d06fde",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "luonian <luonian0124@gmail.com>"
+    }
+  }
+}

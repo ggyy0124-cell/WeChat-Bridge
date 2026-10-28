@@ -17,7 +17,6 @@ if str(APP_ROOT) not in sys.path:
 install_crypto_stub()
 sys.modules.setdefault("qrcode", types.ModuleType("qrcode"))
 import config as cfg
-import webapp.api_handlers as api_handlers
 import webapp.server as server_mod
 from webapp.api_handlers import handle_qr_status
 from webapp.context import WebAppContext
@@ -55,7 +54,6 @@ class _FakeBridge:
         self.contacts = {"uid-1": "Alice"}
         self.context_tokens = {"uid-1": "ctx-token"}
         self._running = True
-        self.ag_inbox = []
         self.sent = []
         self.send_allow_buffer = []
         self.db = _FakeMessageStore()
@@ -146,15 +144,6 @@ class _FakeBridge:
 
     def _load_contacts(self):
         self.load_contacts_called = True
-
-
-class _FakeAIManager:
-    def __init__(self):
-        self.calls = []
-
-    def one_shot(self, prompt, system_prompt=None):
-        self.calls.append((prompt, system_prompt))
-        return f"分析结果: {prompt}"
 
 
 class _JsonHandler:
@@ -409,17 +398,6 @@ class WebAppServerTests(unittest.TestCase):
         self.assertIn("Internal server error", body)
         self.assertNotIn("private get detail", body)
 
-    def test_weather_module_loader_finds_repo_examples_dir(self):
-        previous_module = api_handlers._weather_module
-        api_handlers._weather_module = None
-        try:
-            module = api_handlers._load_weather_module()
-        finally:
-            api_handlers._weather_module = previous_module
-
-        self.assertTrue(hasattr(module, "build_weather_snapshot"))
-        self.assertEqual(module.DEFAULT_WEATHER_CITY, "紫金")
-
     def test_api_status_returns_service_state(self):
         status, _, body = self._request("/api/status")
         self.assertEqual(status, 200)
@@ -625,101 +603,48 @@ class WebAppServerTests(unittest.TestCase):
             [("Alice", "## 市场简报 11:05\n\n---\n\n- 金财互联: +0.66%", "api_push", "市场简报 11:05")],
         )
 
-    def test_api_ai_config_persists_webhook_settings(self):
+    def test_api_settings_persists_only_keepalive(self):
         payload = json.dumps(
             {
+                "keepalive_remind_minutes": 600,
+                "enabled": True,
+                "api_key": "sk-test",
                 "webhook_enabled": True,
-                "webhook_url": " https://example.com/webhook ",
-                "webhook_mode": "all_messages",
-                "webhook_timeout": 9,
+                "webhook_url": "https://example.com/webhook",
+                "telemetry_enabled": True,
             }
         ).encode("utf-8")
         status, _, body = self._request(
-            "/api/ai_config",
+            "/api/settings",
             method="POST",
             data=payload,
             headers={"Content-Type": "application/json"},
         )
         self.assertEqual(status, 200, body)
+        self.assertEqual(cfg.load_config(), {"keepalive_remind_minutes": 600})
 
-        saved = cfg.load_config()
-        self.assertTrue(saved["webhook_enabled"])
-        self.assertEqual(saved["webhook_url"], "https://example.com/webhook")
-        self.assertEqual(saved["webhook_mode"], "all_messages")
-        self.assertEqual(saved["webhook_timeout"], 9)
+        status, _, body = self._request("/api/settings")
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body), {"keepalive_remind_minutes": 600})
 
-    def test_api_ai_config_ignores_removed_telemetry_flag(self):
-        payload = json.dumps({"webhook_timeout": 7, "telemetry_enabled": True}).encode("utf-8")
-        status, _, body = self._request(
+    def test_removed_ai_plugin_and_command_endpoints_return_404(self):
+        auth = {"Content-Type": "application/json", "Authorization": "Bearer secret-token"}
+        for path in (
             "/api/ai_config",
-            method="POST",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        self.assertEqual(status, 200, body)
-
-        saved = cfg.load_config()
-        self.assertEqual(saved["webhook_timeout"], 7)
-        self.assertNotIn("telemetry_enabled", saved)
-
-        status, _, body = self._request("/api/ai_config")
-        self.assertEqual(status, 200, body)
-        self.assertNotIn("telemetry_enabled", json.loads(body))
-
-    def test_api_ai_analyze_calls_one_shot(self):
-        self.bridge.ai_manager = _FakeAIManager()
-        payload = json.dumps({"prompt": "分析签到失败", "system_prompt": "你是青龙运维助手"}).encode("utf-8")
-
-        status, _, body = self._request(
             "/api/ai_analyze",
-            method="POST",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer secret-token",
-            },
-        )
-
-        self.assertEqual(status, 200, body)
-        data = json.loads(body)
-        self.assertTrue(data["ok"])
-        self.assertEqual(data["result"], "分析结果: 分析签到失败")
-        self.assertEqual(data["text"], "分析结果: 分析签到失败")
-        self.assertEqual(self.bridge.ai_manager.calls, [("分析签到失败", "你是青龙运维助手")])
-
-    def test_api_ai_analyze_accepts_content_alias(self):
-        self.bridge.ai_manager = _FakeAIManager()
-        payload = json.dumps({"content": "分析内容字段"}).encode("utf-8")
-
-        status, _, body = self._request(
-            "/api/ai_analyze",
-            method="POST",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer secret-token",
-            },
-        )
-
-        self.assertEqual(status, 200, body)
-        self.assertEqual(json.loads(body)["result"], "分析结果: 分析内容字段")
-
-    def test_api_ai_analyze_requires_prompt(self):
-        self.bridge.ai_manager = _FakeAIManager()
-        payload = json.dumps({"prompt": ""}).encode("utf-8")
-
-        status, _, body = self._request(
-            "/api/ai_analyze",
-            method="POST",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer secret-token",
-            },
-        )
-
-        self.assertEqual(status, 400)
-        self.assertIn("缺少 prompt", body)
+            "/api/commands/run",
+            "/api/weather/query",
+            "/api/ag_inbox",
+            "/api/register_commands",
+            "/api/unregister_commands",
+        ):
+            with self.subTest(path=path):
+                status, _, _ = self._request(path, method="POST", data=b"{}", headers=auth)
+                self.assertEqual(status, 404)
+        for path in ("/api/ai_config", "/api/weather/query?city=shenzhen"):
+            with self.subTest(path=path):
+                status, _, _ = self._request(path, headers=auth)
+                self.assertEqual(status, 404)
 
     def test_expired_qr_status_clears_matching_qr_cache(self):
         self.context.qr_cache.data = {"qrcode": "qr-expired", "qrcode_img_content": "https://example.com/qr"}

@@ -146,7 +146,6 @@ Write-Host ("http://localhost:" + $PORT) -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Optional env vars:" -ForegroundColor Yellow
 Write-Host "    API_TOKEN     - API auth token"
-Write-Host "    WEBHOOK_URL   - Inbound message webhook URL"
 Write-Host ""
 
 # ── 5. Ask to start ──

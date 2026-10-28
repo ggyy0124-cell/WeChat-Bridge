@@ -12,8 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install ruff
-      - run: ruff check app/ tests/ examples/
-      - run: ruff format --check app/ tests/ examples/
+      - run: ruff check app/ tests/
+      - run: ruff format --check app/ tests/
 
   test:
     runs-on: ubuntu-latest

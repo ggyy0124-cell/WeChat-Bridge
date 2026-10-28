@@ -3,12 +3,8 @@ from __future__ import annotations
 """
 轻量事件总线
 
-提供 publish/subscribe 模式，解耦消息处理各阶段：
+提供 publish/subscribe 模式，目前只有管理面板的实时刷新（/api/events）订阅：
 - message_received: 收到入站消息
-- command_received: 收到 / 开头的指令
-- ai_reply_ready: AI 回复生成完成
-- message_sent: 消息发送完成
-- webhook_forward: 消息需要转发到外部 Webhook
 
 所有事件回调在独立线程中异步执行，不阻塞主处理流程。
 """
@@ -23,12 +19,6 @@ logger = logging.getLogger(__name__)
 
 # 预定义事件名称常量
 EVENT_MESSAGE_RECEIVED = "message_received"
-EVENT_COMMAND_RECEIVED = "command_received"
-EVENT_AI_REPLY_READY = "ai_reply_ready"
-EVENT_MESSAGE_SENT = "message_sent"
-EVENT_WEBHOOK_FORWARD = "webhook_forward"
-EVENT_LOGIN = "login"
-EVENT_LOGOUT = "logout"
 
 
 @dataclass

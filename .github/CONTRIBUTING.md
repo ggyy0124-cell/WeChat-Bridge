@@ -30,12 +30,10 @@ wechat-bridge/
 │   ├── bridge.py         # 消息桥接逻辑
 │   ├── ilink.py          # iLink Bot API 封装
 │   ├── web.py            # HTTP API + Web UI
-│   ├── ai_chat.py        # AI 对话模块
-│   ├── config.py         # 配置管理
+│   ├── config.py         # 设置（保活提醒）
 │   ├── db.py             # SQLite 持久化
 │   ├── media.py          # 媒体文件处理
 │   └── requirements.txt  # Python 依赖
-├── ag_monitor/           # 独立监控模块（与核心解耦）
 ├── Dockerfile
 ├── docker-compose.yml
 └── install.sh            # 一键安装脚本
@@ -54,7 +52,7 @@ wechat-bridge/
 1. 从 `main` 分支创建功能分支：`git checkout -b feat/my-feature`
 2. 编写代码并确保测试通过
 3. 提交时使用 [Conventional Commits](https://www.conventionalcommits.org/) 格式：
-   - `feat: 新增 RSS 订阅推送插件`
+   - `feat: 新增 Bark 告警格式适配`
    - `fix: 修复图片解密失败的问题`
    - `docs: 更新 API 文档`
    - `refactor: 重构配置加载逻辑`

@@ -126,5 +126,4 @@ fi
 echo ""
 echo -e "  ${YELLOW}可选配置 (环境变量):${NC}"
 echo -e "    API_TOKEN     — API 接口鉴权 Token"
-echo -e "    WEBHOOK_URL   — 收到消息时 POST 推送的目标地址"
 echo ""

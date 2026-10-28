@@ -3,16 +3,7 @@ from __future__ import annotations
 """已登录页面 LOGGED_IN_JS。"""
 
 LOGGED_IN_JS = r"""
-    // === AI Settings ===
-    const PROVIDER_MODELS = {
-      openai: [{id:'gpt-4o',name:'GPT-4o'},{id:'gpt-4o-mini',name:'GPT-4o Mini'},{id:'gpt-4.1-mini',name:'GPT-4.1 Mini'},{id:'gpt-4.1-nano',name:'GPT-4.1 Nano'}],
-      gemini: [{id:'gemini-2.0-flash',name:'Gemini 2.0 Flash'},{id:'gemini-2.5-flash-preview-04-17',name:'Gemini 2.5 Flash'},{id:'gemini-2.5-pro-preview-03-25',name:'Gemini 2.5 Pro'}],
-      claude: [{id:'claude-sonnet-4-20250514',name:'Claude Sonnet 4'},{id:'claude-3-5-haiku-20241022',name:'Claude 3.5 Haiku'}],
-      deepseek: [{id:'deepseek-chat',name:'DeepSeek Chat (V3)'},{id:'deepseek-reasoner',name:'DeepSeek Reasoner (R1)'}],
-      minimax: [{id:'MiniMax-M2.7',name:'MiniMax M2.7'},{id:'MiniMax-M2.7-highspeed',name:'MiniMax M2.7 Highspeed'},{id:'MiniMax-M2.5',name:'MiniMax M2.5'},{id:'MiniMax-M2.1',name:'MiniMax M2.1'}],
-    };
-    let aiEnabled = false;
-    let webhookEnabled = false;
+    // === 系统设置 ===
     let keepaliveMinutes = 0;
     let currentBotId = localStorage.getItem('currentBotId') || '';
     let accounts = [];
@@ -91,36 +82,6 @@ LOGGED_IN_JS = r"""
       updateKALabel();
     }
 
-    function updateModels() {
-      const provider = document.getElementById('aiProvider').value;
-      const modelEl = document.getElementById('aiModel');
-      const list = document.getElementById('aiModelList');
-      const currentModel = modelEl.value;
-      const presets = PROVIDER_MODELS[provider] || [];
-      list.innerHTML = '';
-      presets.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.id; opt.label = m.name;
-        list.appendChild(opt);
-      });
-      // 切换到预设厂商且当前无值时，填入该厂商第一个预设模型
-      if (!currentModel && presets.length) modelEl.value = presets[0].id;
-    }
-
-    function toggleAI() {
-      aiEnabled = !aiEnabled;
-      document.getElementById('aiToggle').classList.toggle('on', aiEnabled);
-      document.getElementById('aiToggleLabel').textContent = aiEnabled ? 'AI 已启用' : 'AI 已关闭';
-      document.getElementById('aiSettingsGroup').style.display = aiEnabled ? 'block' : 'none';
-    }
-
-    function toggleWebhook() {
-      webhookEnabled = !webhookEnabled;
-      document.getElementById('webhookToggle').classList.toggle('on', webhookEnabled);
-      document.getElementById('webhookToggleLabel').textContent = webhookEnabled ? 'Webhook 已启用' : 'Webhook 已关闭';
-      document.getElementById('webhookSettingsGroup').style.display = webhookEnabled ? 'block' : 'none';
-    }
-
     let notifyEnabled = localStorage.getItem('notifyEnabled') === 'true';
 
     async function toggleNotify() {
@@ -150,41 +111,18 @@ LOGGED_IN_JS = r"""
     }
 
 
-    async function openAISettings() {
+    async function openSettings() {
       try {
-        const res = await fetch('/api/ai_config');
+        const res = await fetch('/api/settings');
         const cfg = await res.json();
-
-        aiEnabled = cfg.enabled || false;
-        document.getElementById('aiToggle').classList.toggle('on', aiEnabled);
-        document.getElementById('aiToggleLabel').textContent = aiEnabled ? 'AI 已启用' : 'AI 已关闭';
-        document.getElementById('aiSettingsGroup').style.display = aiEnabled ? 'block' : 'none';
-
-        webhookEnabled = !!cfg.webhook_enabled;
-        document.getElementById('webhookToggle').classList.toggle('on', webhookEnabled);
-        document.getElementById('webhookToggleLabel').textContent = webhookEnabled ? 'Webhook 已启用' : 'Webhook 已关闭';
-        document.getElementById('webhookSettingsGroup').style.display = webhookEnabled ? 'block' : 'none';
-
         setKAFromMinutes(cfg.keepalive_remind_minutes || 0);
-
-        document.getElementById('aiProvider').value = cfg.provider || 'openai';
-        updateModels();
-        document.getElementById('aiModel').value = cfg.model || '';
-        document.getElementById('aiKey').value = cfg.api_key || '';
-        document.getElementById('aiBaseUrl').value = cfg.base_url || '';
-        document.getElementById('aiPrompt').value = cfg.system_prompt || '';
-        document.getElementById('aiHistory').value = cfg.max_history || 10;
-        document.getElementById('webhookUrl').value = cfg.webhook_url || 'http://127.0.0.1:18082/webhook';
-        document.getElementById('webhookMode').value = cfg.webhook_mode || 'all_messages';
-        document.getElementById('webhookTimeout').value = cfg.webhook_timeout || 5;
-
         renderNotifyToggle();
       } catch(e) {}
-      document.getElementById('aiModal').classList.add('active');
+      document.getElementById('settingsModal').classList.add('active');
     }
 
-    function closeAISettings() {
-      document.getElementById('aiModal').classList.remove('active');
+    function closeSettings() {
+      document.getElementById('settingsModal').classList.remove('active');
     }
 
     function showToast(msg, type='success') {
@@ -219,33 +157,16 @@ LOGGED_IN_JS = r"""
       overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     }
 
-    async function saveAISettings() {
-      const cfg = {
-        enabled: aiEnabled,
-        keepalive_remind_minutes: keepaliveMinutes,
-        provider: document.getElementById('aiProvider').value,
-        model: document.getElementById('aiModel').value,
-        api_key: document.getElementById('aiKey').value,
-        base_url: document.getElementById('aiBaseUrl').value,
-        system_prompt: document.getElementById('aiPrompt').value,
-        max_history: parseInt(document.getElementById('aiHistory').value) || 10,
-        webhook_enabled: webhookEnabled,
-        webhook_url: document.getElementById('webhookUrl').value.trim(),
-        webhook_mode: document.getElementById('webhookMode').value,
-        webhook_timeout: parseInt(document.getElementById('webhookTimeout').value) || 5,
-      };
-      if (cfg.webhook_enabled && !cfg.webhook_url) {
-        showToast('请先填写 Webhook 地址', 'error');
-        return;
-      }
+    async function saveSettings() {
+      const cfg = { keepalive_remind_minutes: keepaliveMinutes };
       try {
-        const res = await fetch('/api/ai_config', {
+        const res = await fetch('/api/settings', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(cfg)
         });
         if (res.ok) {
-          closeAISettings();
+          closeSettings();
           showToast('设置已保存');
         } else {
           const err = await res.json();
@@ -255,8 +176,8 @@ LOGGED_IN_JS = r"""
     }
 
     // 点击遮罩关闭
-    document.getElementById('aiModal').addEventListener('click', e => {
-      if (e.target.id === 'aiModal') closeAISettings();
+    document.getElementById('settingsModal').addEventListener('click', e => {
+      if (e.target.id === 'settingsModal') closeSettings();
     });
     document.getElementById('remarkModal').addEventListener('click', e => {
       if (e.target.id === 'remarkModal') closeRemarkModal();
@@ -1124,7 +1045,7 @@ UID: ${account.ilink_user_id || '—'}`;
         if (e.data === ": keepalive") return;
         try {
           const payload = JSON.parse(e.data);
-          if (['message_received', 'message_sent', 'ai_reply_ready'].includes(payload.event)) {
+          if (payload.event === 'message_received') {
             fetchMsgs();
           }
         } catch (err) {}

@@ -55,7 +55,7 @@ LOGGED_IN_CONTENT = """
               </svg>
               <span>添加账号</span>
             </button>
-            <button class="menu-item" onclick="openAISettings(); closeMoreMenu();" type="button">
+            <button class="menu-item" onclick="openSettings(); closeMoreMenu();" type="button">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path>
               </svg>
@@ -158,7 +158,7 @@ LOGGED_IN_CONTENT = """
 </div>
 
 <!-- System Settings Modal -->
-<div class="modal-overlay" id="aiModal">
+<div class="modal-overlay" id="settingsModal">
   <div class="modal">
     <h2>⚙️ 系统设置</h2>
 
@@ -190,81 +190,6 @@ LOGGED_IN_CONTENT = """
 
     <div style="border-top: 1px solid #444; margin: 20px 0;"></div>
 
-    <h3 style="margin-bottom: 15px; font-size:15px; color:#ddd;">🤖 智能回复助手</h3>
-    <div class="form-group">
-      <div class="toggle-switch" onclick="toggleAI()">
-        <div class="toggle-track" id="aiToggle"><div class="toggle-knob"></div></div>
-        <span id="aiToggleLabel">AI 已关闭</span>
-      </div>
-    </div>
-
-    <div id="aiSettingsGroup" style="display: none;">
-      <div class="form-group">
-        <label class="form-label">AI 厂商</label>
-        <input class="form-input" id="aiProvider" list="aiProviderList" placeholder="选择预设或输入自定义厂商（如 ollama）" autocomplete="off" oninput="updateModels()">
-        <datalist id="aiProviderList">
-          <option value="openai" label="OpenAI">
-          <option value="gemini" label="Google Gemini">
-          <option value="claude" label="Anthropic Claude">
-          <option value="deepseek" label="DeepSeek">
-          <option value="minimax" label="MiniMax">
-        </datalist>
-      </div>
-      <div class="form-group">
-        <label class="form-label">模型</label>
-        <input class="form-input" id="aiModel" list="aiModelList" placeholder="选择预设或输入自定义模型名称（如 qwen3:8b）" autocomplete="off">
-        <datalist id="aiModelList"></datalist>
-      </div>
-      <div class="form-group">
-        <label class="form-label">API Key</label>
-        <input class="form-input" id="aiKey" type="password" placeholder="输入你的 API Key">
-      </div>
-      <div class="form-group">
-        <label class="form-label">自定义 Base URL（可选）</label>
-        <input class="form-input" id="aiBaseUrl" placeholder="留空使用默认地址；自定义厂商填写 OpenAI-compatible /v1 地址">
-      </div>
-      <div class="form-group">
-        <label class="form-label">System Prompt</label>
-        <textarea class="form-textarea" id="aiPrompt" rows="3"></textarea>
-      </div>
-      <div class="form-group">
-        <label class="form-label">历史轮数</label>
-        <input class="form-input" id="aiHistory" type="number" min="1" max="50" value="10">
-      </div>
-    </div>
-
-    <div style="border-top: 1px solid #444; margin: 20px 0;"></div>
-
-    <h3 style="margin-bottom: 15px; font-size:15px; color:#ddd;">🔗 外部 Webhook</h3>
-    <div class="form-group">
-      <div class="toggle-switch" onclick="toggleWebhook()">
-        <div class="toggle-track" id="webhookToggle"><div class="toggle-knob"></div></div>
-        <span id="webhookToggleLabel">Webhook 已关闭</span>
-      </div>
-      <div style="color:#888; font-size:12px; margin-top:6px;">开启后，消息会按配置模式异步转发到外部服务，外部服务可再调用 /api/send 回写微信。</div>
-    </div>
-
-    <div id="webhookSettingsGroup" style="display: none;">
-      <div class="form-group">
-        <label class="form-label">Webhook 地址 (已由 WebhookManager 接管)</label>
-        <input class="form-input" id="webhookUrl" readonly style="background: #333; cursor: not-allowed; color: #888;">
-        <div style="color:#666; font-size:11px; margin-top:4px;">插件系统强制启用，自动由 WebhookManager (端口 18082) 处理。</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">转发模式</label>
-        <select class="form-select" id="webhookMode">
-          <option value="unknown_command">仅未知命令</option>
-          <option value="all_messages">全部消息</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">请求超时（秒）</label>
-        <input class="form-input" id="webhookTimeout" type="number" min="1" max="30" value="5">
-      </div>
-    </div>
-
-    <div style="border-top: 1px solid #444; margin: 20px 0;"></div>
-
     <div style="text-align:center; color:#666; font-size:12px; line-height:1.8;">
       <a href="https://github.com/ggyy0124-cell/WeChat-Bridge" target="_blank" rel="noopener"
          style="color:#818cf8; text-decoration:none; transition:color 0.2s;"
@@ -275,8 +200,8 @@ LOGGED_IN_CONTENT = """
     </div>
 
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeAISettings()">取消</button>
-      <button class="btn-save" onclick="saveAISettings()">保存设置</button>
+      <button class="btn-cancel" onclick="closeSettings()">取消</button>
+      <button class="btn-save" onclick="saveSettings()">保存设置</button>
     </div>
   </div>
 </div>

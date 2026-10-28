@@ -174,12 +174,10 @@ class AccountManager:
         self,
         data_base: str,
         *,
-        ai_manager=None,
         client_factory=ILinkClient,
         bridge_factory=WeChatBridge,
     ):
         self.data_base = data_base
-        self.ai_manager = ai_manager
         self.client_factory = client_factory
         self.bridge_factory = bridge_factory
         self._runtimes: dict[str, AccountRuntime] = {}
@@ -362,8 +360,6 @@ class AccountManager:
             bridge = self.bridge_factory(client, data_base=self.data_base)
         except TypeError:
             bridge = self.bridge_factory(client)
-        if self.ai_manager is not None:
-            bridge.ai_manager = self.ai_manager
         bridge.start()
 
         runtime = AccountRuntime(

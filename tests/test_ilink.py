@@ -181,7 +181,7 @@ class HeadersTests(unittest.TestCase):
     def test_base_info_uses_ilink_channel_version(self):
         self.assertEqual(
             ilink._base_info(),
-            {"channel_version": "2.4.9", "bot_agent": "WeChat-Bridge/1.4.0-0.1"},
+            {"channel_version": "2.4.9", "bot_agent": "WeChat-Bridge/1.4.0-0.2"},
         )
 
     def test_bot_agent_sanitizer_rejects_unsafe_tokens(self):

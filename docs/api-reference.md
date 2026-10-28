@@ -83,39 +83,6 @@ Docker 部署可设置环境变量 `MARKDOWN_MODE=normalize` 作为全局默认�
 
 ---
 
-## AI 分析接口（青龙 / 自动化调用）
-
-`POST /api/ai_analyze` 用于让外部脚本调用 Web 管理面板中配置的 AI 能力。该接口不会发送微信消息，也不会写入任何用户对话历史，适合青龙任务、巡检脚本和日志分析脚本同步获取分析结论。
-
-```bash
-curl -X POST http://localhost:5200/api/ai_analyze \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{
-    "prompt": "请分析今天青龙签到失败原因，并给出下一步排查建议。",
-    "system_prompt": "你是一个 iStoreOS 和青龙运维助手，回答要直接、可执行。"
-  }'
-```
-
-请求字段：
-
-| 字段 | 必填 | 说明 |
-|---|---|---|
-| `prompt` | 是 | 要分析的内容；也兼容 `text` / `content` 字段名 |
-| `system_prompt` | 否 | 单次调用的系统提示词，不传则使用 Web UI 中配置的默认提示词 |
-
-响应示例：
-
-```json
-{
-  "ok": true,
-  "result": "分析结论...",
-  "text": "分析结论..."
-}
-```
-
----
-
 ## 快捷推送（兼容青龙面板 / ntfy / Bark）
 
 这个接口专为第三方系统集成设计。如果未显式指定 `to`，系统会自动将消息发送给当前 Bot 最近记录的接收目标。微信 Bot 本身没有“联系人列表”概念，这里的接收目标来自本服务收到过消息后的本地缓存。
@@ -269,18 +236,10 @@ curl http://localhost:5200/api/status
 |---------|--------|------|
 | `PORT` | `5200` | 服务监听端口 |
 | `DATA_DIR` | `./data` | 多 Bot 数据根目录，实例数据位于 `DATA_DIR/<稳定账号标识>/`，新版本优先使用 iLink 用户 ID，旧版 `bot_id` 目录会在登录/恢复时迁移 |
-| `WEBHOOK_URL` | _(空)_ | 外部 Webhook 地址，也可在 Web UI 中配置 |
-| `WEBHOOK_ENABLED` | `false` | 是否开启外部 Webhook 转发 |
-| `WEBHOOK_MODE` | `unknown_command` | 转发模式：`unknown_command` / `all_messages` |
-| `WEBHOOK_TIMEOUT` | `5` | Webhook 请求超时（秒，1~30） |
 | `API_TOKEN` | _(空)_ | API 鉴权 Token，未设置则无鉴权 |
 | `TOKEN_FILE` | `./data/token.json` | 旧版单 Bot 凭证路径；启动后会迁移到实例目录 |
-| `AI_ENABLED` | `false` | 是否启用 AI 助手 |
-| `AI_PROVIDER` | `openai` | AI 厂商预设：`openai` / `gemini` / `claude` / `deepseek` / `minimax`，也可填自定义 OpenAI-compatible 厂商名 |
-| `AI_MODEL` | `gpt-4o-mini` | AI 模型名称 |
-| `AI_BASE_URL` | _(空)_ | 自定义 OpenAI-compatible `/v1` Base URL，留空使用预设厂商默认地址 |
 | `CONTACTS_FILE` | `/data/contacts.json` | 接收目标缓存路径（历史命名为 contacts） |
-| `AI_CONFIG_FILE` | `/data/ai_config.json` | AI 助手配置文件路径 |
+| `AI_CONFIG_FILE` | `/data/ai_config.json` | 设置文件路径（保存保活提醒设置），沿用历史文件名 |
 | `PENDING_MESSAGE_TTL_HOURS` | `72` | 普通缓存消息保留小时数，过期后标记为 `DISCARDED`；设为 `0` 表示不过期 |
 | `PENDING_TIME_SENSITIVE_TTL_HOURS` | `24` | 行情、保活、设备上下线等时效缓存消息保留小时数 |
 | `PENDING_MEDIA_TTL_HOURS` | `168` | 图片等媒体缓存消息保留小时数 |
@@ -303,34 +262,3 @@ curl http://localhost:5200/api/status
 | 媒体消息 | 168 小时 | `pending_messages.media` 不为空 |
 
 清理动作是软删除：`pending_messages.status` 更新为 `DISCARDED`，相关消息在历史中显示为“已丢弃”，不会物理删除记录。若某个 overflow session 的待拉取消息全部过期，该 session 会标记为 `DISCARDED`，对应接收目标的投递状态恢复为 `NORMAL`。
-
----
-
-## Webhook 推送格式
-
-当开启外部 Webhook 后，收到微信消息时会向该地址发送 POST 请求。该能力默认关闭，可在 Web UI 的“系统设置 -> 外部 Webhook”中启用，也可通过环境变量启用。
-
-```json
-{
-  "source": "wechat-bridge",
-  "from_user": "用户ID",
-  "from_name": "显示名",
-  "text": "消息内容 (图片为 [图片:文件名], 视频为 [视频:文件名])",
-  "msg_id": "消息ID",
-  "timestamp": 1712345678,
-  "msg_type": 1,
-  "is_command": false,
-  "command": "",
-  "args": ""
-}
-```
-
-说明：
-
-- `unknown_command` 模式：仅未知 `/命令` 会转发到外部 Webhook，已知命令仍由 WeChat Bridge 本地处理。
-- `all_messages` 模式：全部文本消息都会转发到外部 Webhook。
-- 推荐使用异步回写：外部服务处理完后，再调用 `POST /api/send` 将结果回发到微信。
-
-完整接入流程、示例脚本与调试方法请参阅：
-
-- [异步回写集成指南](webhook-async-reply.md)

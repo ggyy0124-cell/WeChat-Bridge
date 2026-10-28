@@ -83,8 +83,6 @@ services:
       - TOKEN_FILE=/data/token.json
       - DATA_DIR=/data
       - AI_CONFIG_FILE=/data/ai_config.json
-      - WEBHOOK_URL=           # 可选：外部 Webhook 地址
-      - WEBHOOK_MODE=unknown_command  # 可选：unknown_command / all_messages
       - API_TOKEN=change-this-token    # 网络可访问时建议修改为强随机值
       - MARKDOWN_MODE=          # 可选：normalize 整理普通通知为 Markdown；plain 降级为纯文本；留空默认按 Markdown 发送
       - TZ=Asia/Shanghai
@@ -95,7 +93,7 @@ docker compose up -d
 
 安装完成后，浏览器打开 `http://localhost:5200`，扫码登录即可。
 
-> Webhook 也可以在 Web 管理面板中配置。环境变量适合容器化部署统一管理，Web UI 适合单机快速启用或临时调试。个人挂载、代理和内网服务地址建议放到未提交的 `docker-compose.override.yml`。
+> 个人挂载、代理和内网服务地址建议放到未提交的 `docker-compose.override.yml`。
 
 ---
 

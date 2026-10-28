@@ -13,8 +13,6 @@ services:
       - DATA_DIR=/data
       - AI_CONFIG_FILE=/data/ai_config.json
       - MARKDOWN_MODE=
-      - WEBHOOK_URL=
-      - WEBHOOK_MODE=unknown_command
       - API_TOKEN=change-this-token
       - TZ=Asia/Shanghai
     logging:

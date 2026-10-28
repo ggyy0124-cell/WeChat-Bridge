@@ -662,7 +662,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .refresh-btn:hover { transform: scale(1.05); }
   .hint { margin-top: 20px; color: #666; font-size: 12px; line-height: 1.6; }
 
-  /* AI Settings Modal */
+  /* Settings Modal */
   .ai-settings-btn {
     background: rgba(99,102,241,0.15);
     color: #818cf8;

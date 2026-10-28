@@ -4,7 +4,7 @@
 
 **把微信 Bot 变成可编程的 HTTP 消息通道**
 
-**Open-source Python bridge for WeChat Bot messages: send via HTTP API, receive via Webhook, and deploy with Docker.**
+**Open-source Python bridge for pushing messages to WeChat via HTTP API, deployable with Docker.**
 
 **轻量 · 数据主权 · 跨平台开箱即用**
 
@@ -16,18 +16,18 @@
 
 ---
 
-> **关于本分支**：本仓库 fork 自 [yuuouu/WeChat-Bridge](https://github.com/yuuouu/WeChat-Bridge)（MIT License），基于上游 v1.4.0 维护。版本号形如 `v1.4.0-0.1`，即「上游版本号 - 本分支修订号」。与上游相比：
+> **关于本分支**：本仓库 fork 自 [yuuouu/WeChat-Bridge](https://github.com/yuuouu/WeChat-Bridge)（MIT License），基于上游 v1.4.0 维护。版本号形如 `v1.4.0-0.2`，即「上游版本号 - 本分支修订号」。与上游相比：
 >
 > - 移除遥测、匿名统计以及启动时的版本检查，不再向任何统计服务发送请求
 > - 移除「通过微信远程操控 AI CLI」（Bridge Code Agent）模块
+> - 移除内置 AI 助手、插件系统和 Webhook 消息转发，只保留对外推送微信消息和微信内置指令
 > - 安装脚本、Docker 镜像和文档均指向本仓库
 >
 > 完整变更见 [更新日志](docs/CHANGELOG.md)。
 
-WeChat Bridge 使用 HTTP API 把服务器、NAS 和自动化服务的通知发送到微信，也能通过 Webhook 把微信消息交给外部服务处理。
+WeChat Bridge 使用 HTTP API 把服务器、NAS 和自动化服务的通知发送到微信。收到的微信消息只记录在管理面板中，并响应少量内置指令（如 `/status`、`/pull`），不转发给外部服务，也不自动回复。
 
 - [通过 HTTP API 发送微信消息](docs/api-reference.md)：接口参数、鉴权与调用示例
-- [通过 Webhook 接收微信消息并异步回写](docs/webhook-async-reply.md)：双向消息流程与调试
 - [使用 Docker 或安装脚本部署微信 Bot](docs/deployment.md)：部署、升级与管理
 
 ---
@@ -159,18 +159,16 @@ curl "https://bot.example.com/api/send?token=change-this-token&to=好友名称&t
 | 青龙面板、iStoreOS、OpenWrt 通知 | 配置自定义 Webhook URL 指向 `/api/send` 或 `/api/push` |
 | Grafana、Uptime Kuma、GitHub 告警 | 调用 `/api/webhook/<type>`，自动格式化为微信友好文本 |
 | 手机快捷指令、Tasker、云函数 | 公网 HTTPS 域名 + Bearer Token 调用 `/api/send` |
-| 外部 AI / 工作流平台 | 微信消息转发到 Webhook，服务处理后回调 `/api/send` |
-| 个人命令中心 | 在微信发送指令，外部服务执行查询、记账、笔记、自动化操作后回写 |
 
-完整接口与平台示例见 [API 接口参考](docs/api-reference.md) 和 [Webhook 示例](docs/webhook-examples.md)
+完整接口与平台示例见 [API 接口参考](docs/api-reference.md)
 
 ---
 
 ## 核心能力
 
-- **标准 HTTP API**：`/api/send`、`/api/send_image`、`/api/push`、`/api/webhook`、`/api/ai_analyze`、`/api/contacts`、`/api/status`
-- **双向消息桥接**：微信消息可进入 Web UI、内置 AI 或外部 Webhook；外部服务可异步回写微信
-- **Web 管理面板**：扫码登录、实时消息流、联系人缓存、图片收发、AI 配置、Webhook 配置、保活设置
+- **标准 HTTP API**：`/api/send`、`/api/send_image`、`/api/push`、`/api/webhook`、`/api/contacts`、`/api/status`
+- **内置指令**：在微信中发送 `/status`、`/pull`、`/mute` 等指令查看状态、补拉缓存消息、临时静默
+- **Web 管理面板**：扫码登录、实时消息流、联系人缓存、图片收发、保活设置
 - **桌面通知**：网页驻留后台时，可调用主流操作系统的原生系统通知
 - **投递保护**：24h 窗口和连续 10 条限制下，自动缓存受阻消息，过期缓存自动标记丢弃，并支持 `/pull` 补拉
 - **可见化状态**：Web UI 展示 `已缓存 / 已补拉 / 已丢弃 / 可能已送达` 等投递标签
@@ -214,25 +212,6 @@ curl http://localhost:5200/api/status
 
 ---
 
-## 双向 Webhook 工作流
-
-```mermaid
-sequenceDiagram
-    participant User as 微信用户
-    participant Bridge as WeChat Bridge
-    participant Service as 外部服务 / AI / 工作流
-
-    User->>Bridge: 发送消息或指令
-    Bridge->>Service: POST Webhook
-    Service->>Service: 执行业务逻辑
-    Service->>Bridge: POST /api/send
-    Bridge->>User: 回写微信消息
-```
-
-如果业务处理耗时较长，推荐异步回写：Bridge 收到消息后立即把事件推给你的服务，你的服务处理完成后再调用 `/api/send`，详见 [异步回写集成指南](docs/webhook-async-reply.md)
-
----
-
 ## 微信侧限制
 
 WeChat Bridge 基于腾讯 iLink Bot API，无法绕过官方接口限制：
@@ -251,21 +230,6 @@ WeChat Bridge 基于腾讯 iLink Bot API，无法绕过官方接口限制：
 
 ---
 
-## 内置 AI 助手
-
-通过 Web 管理面板配置，无需改代码：
-
-| 厂商 | 支持模型 |
-|---|---|
-| OpenAI | GPT-4o, GPT-4o Mini, GPT-4.1 Mini/Nano |
-| Google | Gemini 2.0 Flash, 2.5 Flash/Pro |
-| Anthropic | Claude Sonnet 4, Claude 3.5 Haiku |
-| DeepSeek | DeepSeek Chat (V3), Reasoner (R1) |
-| MiniMax | MiniMax M2.7, M2.7 Highspeed, M2.5, M2.1 |
-| 自定义 | 任意 OpenAI-compatible `/v1` 服务 |
-
----
-
 ## 微信可用指令
 
 | 指令 | 说明 |
@@ -273,10 +237,8 @@ WeChat Bridge 基于腾讯 iLink Bot API，无法绕过官方接口限制：
 | `/help` | 显示帮助菜单 |
 | `/status` | 查看服务状态、发送额度和配置 |
 | `/uid` | 获取自己的用户 ID |
-| `/retry` | 重新生成 AI 回复 |
 | `/keepalive [on\|off]` | 开启或关闭 23h 通道提醒 |
-| `/ai [on\|off]` | 开启或关闭 AI 自动回复 |
-| `/clear` | 清除 AI 对话历史 |
+| `/mute 时长` | 临时静默，期间推送自动缓存（如 `/mute 2h`），回复任意内容解除 |
 | `/pull` | 拉取当前缓存会话中的未送达消息 |
 
 ---
@@ -285,11 +247,8 @@ WeChat Bridge 基于腾讯 iLink Bot API，无法绕过官方接口限制：
 
 | 文档 | 说明 |
 |---|---|
-| [部署与管理指南](docs/deployment.md) | 手动安装、Docker、AI 辅助部署、版本升级 |
+| [部署与管理指南](docs/deployment.md) | 手动安装、Docker、版本升级 |
 | [API 接口参考](docs/api-reference.md) | 完整 API、青龙面板 / iStoreOS 集成、Webhook 适配器 |
-| [异步回写集成指南](docs/webhook-async-reply.md) | 外部 Webhook 接入流程与调试建议 |
-| [Webhook 示例](docs/webhook-examples.md) | 会话式插件与无状态命令示例 |
-| [插件开发指南](docs/plugin-development.md) | 插件接口、manifest、生命周期与安全要求 |
 | [工作原理](docs/architecture.md) | iLink 协议桥接时序图与核心流程解析 |
 | [安全策略](SECURITY.md) | 漏洞报告方式与部署安全清单 |
 | [更新日志](docs/CHANGELOG.md) | 版本变更记录 |
@@ -300,8 +259,7 @@ WeChat Bridge 基于腾讯 iLink Bot API，无法绕过官方接口限制：
 
 本项目**不包含任何遥测、匿名统计或版本检查**，不会向作者或任何第三方上报版本号、系统信息、运行状态或使用情况。
 
-- **核心程序的对外请求**：仅限腾讯 iLink 接口与微信 CDN（微信消息收发必需），以及你在 Web 管理面板中自行配置的 AI 厂商接口和 Webhook 地址
-- **示例插件**：`examples/` 中的天气、找书、转发等插件，仅在你启用并调用对应命令时才会访问各自的数据源
+- **对外请求**：仅限腾讯 iLink 接口与微信 CDN（微信消息收发必需），不会把收到的微信消息转发给任何外部服务
 - **安装脚本**：只从本仓库的 GitHub 地址下载源码，不经过任何第三方代理或统计服务
 - **升级**：不会在启动时检查更新，请按 [部署指南](docs/deployment.md) 中的方式手动升级
 - **数据留存**：微信登录凭据、消息记录和配置只保存在你自己的 `data/` 目录

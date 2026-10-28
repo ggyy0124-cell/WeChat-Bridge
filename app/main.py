@@ -40,7 +40,6 @@ logger = logging.getLogger("wechat-bridge")
 # 确保能 import 同目录模块
 sys.path.insert(0, os.path.join(_project_root, "app"))
 
-import config as cfg
 import db
 import web
 from accounts import AccountManager
@@ -58,34 +57,12 @@ def main():
     logger.info("端口: %d", port)
     data_dir = os.environ.get("DATA_DIR", "./data")
     logger.info("数据目录: %s", data_dir)
-    runtime_cfg = cfg.load_config()
-    webhook_url = runtime_cfg.get("webhook_url", "").strip()
-    webhook_enabled = bool(runtime_cfg.get("webhook_enabled")) and bool(webhook_url)
-    webhook_mode = runtime_cfg.get("webhook_mode", "unknown_command")
-    if webhook_enabled:
-        logger.info("Webhook: %s (%s)", webhook_url, webhook_mode)
-    elif webhook_url:
-        logger.info("Webhook: %s (已配置未启用)", webhook_url)
-    else:
-        logger.info("Webhook: (未配置)")
-
     logger.info("API Token: %s", "已设置" if os.environ.get("API_TOKEN") else "(未设置，接口无鉴权)")
     logger.info("日志文件: %s", _log_file)
     logger.info("=" * 50)
 
-    # ==== 新增：注入 AI 模块 ====
-    ai_manager = None
-    try:
-        from ai_chat import AIChatManager
-
-        ai_manager = AIChatManager(cfg.load_config, cfg.save_config)
-        logger.info("✅ AI 模块已挂载")
-    except Exception as e:
-        logger.error("❌ AI 模块加载失败: %s", e)
-    # ==========================
-
     # 初始化多账号运行时并恢复已保存账号
-    account_manager = AccountManager(data_dir, ai_manager=ai_manager)
+    account_manager = AccountManager(data_dir)
     restored = account_manager.restore_accounts()
     logger.info("已恢复 %d 个微信账号", len(restored))
 

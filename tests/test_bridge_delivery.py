@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -544,24 +545,13 @@ class BridgeDeliveryTests(unittest.TestCase):
         self.assertNotEqual(self.bridge._media_dir, bridge_two._media_dir)
 
     def test_builtin_command_replies_are_markdown_formatted(self):
-        # Disable webhook to ensure we get the fallback "未知指令" reply
-        current_cfg = cfg.load_config()
-        current_cfg["webhook_enabled"] = False
-        cfg.save_config(current_cfg)
-
         cases = [
             ("/help", "## 📋 可用指令", "- `/status`"),
             ("/status", "## 🤖 WeChat Bridge", "### 运行状态"),
-            ("/ai", "## 🤖 AI 助手", "- **状态**：❌ 未启用"),
-            ("/clear", "## ✅ 清除完成", "- AI 对话历史已清除"),
             ("/uid", "## 🆔 用户 ID", "`uid-1`"),
-            ("/retry", "## 🤖 AI 助手", "- **状态**：❌ 未启用"),
             ("/keepalive bad", "## ❓ 用法", "`/keepalive on`"),
             ("/keepalive on", "## ✅ 保活提醒", "- **提醒时间**"),
             ("/keepalive off", "## ❌ 保活提醒", "- **状态**：已关闭"),
-            ("/ai on", "## ✅ AI 助手", "- **提醒**"),
-            ("/ai off", "## ❌ AI 助手", "- **状态**：已关闭"),
-            ("/ai bad", "## ❓ 用法", "`/ai on`"),
             ("/unknown", "## ❓ 未知指令", "- **收到**：`/unknown`"),
         ]
 
@@ -597,41 +587,80 @@ class BridgeDeliveryTests(unittest.TestCase):
         self.assertIn("**标题**：测试标题", block)
         self.assertIn("> 图片已缓存，文件：`image.jpg`", block)
 
-    def test_retry_progress_message_is_markdown_formatted(self):
-        class _FakeAIManager:
-            def chat(self, user_id, text):
-                return "AI reply"
-
-        user_id = "uid-1@im.wechat"
-        self.bridge.contacts[user_id] = "Alice"
-        self.bridge.context_tokens[user_id] = "ctx-1"
-        self.bridge.ai_manager = _FakeAIManager()
-        self.bridge.recent_messages.append(
-            {
-                "user_id": user_id,
-                "type": "recv",
-                "text": "上一条问题",
-            }
-        )
-
+    def _receive(self, text: str, msg_id: str):
         self.bridge.process_message(
             {
                 "message_type": 1,
-                "from_user_id": user_id,
+                "from_user_id": "uid-1",
                 "from_user_nickname": "Alice",
                 "context_token": "ctx-1",
-                "msg_id": "retry-1",
-                "item_list": [{"type": 1, "text_item": {"text": "/retry"}}],
+                "msg_id": msg_id,
+                "item_list": [{"type": 1, "text_item": {"text": text}}],
             }
         )
 
-        deadline = time.time() + 1
-        while len(self.client.sent_texts) < 2 and time.time() < deadline:
-            time.sleep(0.01)
+    def _enable_legacy_webhook(self):
+        with open(cfg.CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "keepalive_remind_minutes": 1380,
+                    "enabled": True,
+                    "api_key": "sk-legacy",
+                    "webhook_enabled": True,
+                    "webhook_url": "https://example.com/hook",
+                    "webhook_mode": "all_messages",
+                },
+                f,
+            )
+        cfg._invalidate_config_cache()
 
-        self.assertGreaterEqual(len(self.client.sent_texts), 2)
-        self.assertIn("## 🔄 正在重试", self.client.sent_texts[0][1])
-        self.assertIn("- 正在为您重新生成回答", self.client.sent_texts[0][1])
+    def test_removed_commands_reply_unknown_command(self):
+        for idx, command in enumerate(["/ai", "/ai on", "/retry", "/clear", "/note", "/天气 深圳", "/书籍 三体"]):
+            self._receive(command, f"removed-{idx}")
+        replies = [text for _, text, _ in self.client.sent_texts]
+        self.assertEqual(len(replies), 7)
+        for reply in replies:
+            self.assertIn("## ❓ 未知指令", reply)
+
+    def test_help_lists_only_builtin_commands(self):
+        self._receive("/help", "help-1")
+        reply = self.client.sent_texts[-1][1]
+        for command in ("/status", "/pull", "/mute", "/uid", "/keepalive"):
+            self.assertIn(command, reply)
+        for removed in ("/ai", "/retry", "/clear", "扩展指令"):
+            self.assertNotIn(removed, reply)
+
+    def test_unknown_command_replies_even_with_legacy_webhook_config(self):
+        self._enable_legacy_webhook()
+        with patch("requests.post") as post:
+            self._receive("/random_unknown_cmd xyz", "unknown-1")
+            time.sleep(0.1)
+        post.assert_not_called()
+        self.assertEqual(len(self.client.sent_texts), 1)
+        self.assertIn("## ❓ 未知指令", self.client.sent_texts[0][1])
+
+    def test_plain_text_is_recorded_without_reply_or_forwarding(self):
+        self._enable_legacy_webhook()
+        typing = []
+        self.client.send_typing = lambda *args, **kwargs: typing.append(args) or {}
+        with patch("requests.post") as post:
+            self._receive("hello bridge", "plain-1")
+            time.sleep(0.1)
+        post.assert_not_called()
+        self.assertEqual(self.client.sent_texts, [])
+        self.assertEqual(typing, [])
+        received = [m for m in db.get_messages(limit=20) if m["type"] == "recv"]
+        self.assertEqual([m["text"] for m in received], ["hello bridge"])
+
+    def test_message_received_event_carries_no_message_content(self):
+        from event_bus import EVENT_MESSAGE_RECEIVED
+
+        events = []
+        self.bridge.event_bus.subscribe(EVENT_MESSAGE_RECEIVED, events.append, subscriber_id="test")
+        self.bridge.event_bus.publish = lambda event, sync=False: events.append(event)
+        self._receive("机密内容", "event-1")
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].data, {"bot_id": "bot-test"})
 
     def test_window_expired_messages_are_buffered(self):
         self.bridge.activity_tracker["uid-1"] = {
@@ -863,46 +892,6 @@ class BridgeDeliveryTests(unittest.TestCase):
         self.assertEqual(uncertain[0]["text"], "hello-timeout")
         self.assertTrue(uncertain[0]["meta"]["delivery_uncertain"])
         self.assertEqual(uncertain[0]["msg_id"], result["message_id"])
-
-    def test_unknown_command_can_be_handed_off_to_webhook(self):
-        triggered = []
-        current = cfg.load_config()
-        current["webhook_enabled"] = True
-        current["webhook_url"] = "https://example.com/hook"
-        current["webhook_mode"] = "unknown_command"
-        cfg.save_config(current)
-
-        def _fake_trigger(from_user, from_name, text, msg, *, is_command=False):
-            triggered.append(
-                {
-                    "from_user": from_user,
-                    "from_name": from_name,
-                    "text": text,
-                    "is_command": is_command,
-                }
-            )
-
-        self.bridge._trigger_webhook = _fake_trigger
-        self.bridge.process_message(
-            {
-                "message_type": 1,
-                "from_user_id": "uid-1",
-                "from_user_nickname": "Alice",
-                "context_token": "ctx-1",
-                "msg_id": "m1",
-                "item_list": [{"type": 1, "text_item": {"text": "/random_unknown_cmd xyz"}}],
-            }
-        )
-        deadline = time.time() + 1.0
-        while len(triggered) == 0 and time.time() < deadline:
-            time.sleep(0.05)
-
-        self.assertEqual(len(triggered), 1)
-        self.assertEqual(triggered[0]["text"], "/random_unknown_cmd xyz")
-        self.assertTrue(triggered[0]["is_command"])
-        self.assertEqual(len(self.client.sent_texts), 0)
-
-    # ── send_image 边界场景 ──
 
     def test_send_image_success_records_media_in_message_history(self):
         """正常发送：消息记录里 media 字段指向保存的文件名。"""
@@ -1184,31 +1173,6 @@ class BridgeDeliveryTests(unittest.TestCase):
         buffered_img = [m for m in messages if m["delivery_stage"] == "buffered" and m["media"]]
         self.assertEqual(len(buffered_img), 1)
 
-    def test_all_messages_mode_forwards_regular_messages(self):
-        triggered = []
-        current = cfg.load_config()
-        current["webhook_enabled"] = True
-        current["webhook_url"] = "https://example.com/hook"
-        current["webhook_mode"] = "all_messages"
-        cfg.save_config(current)
-
-        def _fake_trigger(from_user, from_name, text, msg, *, is_command=False):
-            triggered.append({"text": text, "is_command": is_command})
-
-        self.bridge._trigger_webhook = _fake_trigger
-        self.bridge.process_message(
-            {
-                "message_type": 1,
-                "from_user_id": "uid-1",
-                "from_user_nickname": "Alice",
-                "context_token": "ctx-1",
-                "msg_id": "m2",
-                "item_list": [{"type": 1, "text_item": {"text": "hello bridge"}}],
-            }
-        )
-
-        self.assertEqual(triggered, [{"text": "hello bridge", "is_command": False}])
-
 
 class TestMuteFeature(BridgeDeliveryTests):
     """Tests for /mute command and its interaction with outbound delivery."""
@@ -1243,11 +1207,11 @@ class TestMuteFeature(BridgeDeliveryTests):
         self.assertTrue(result.get("buffered"), "API message should be buffered during mute")
         self.assertNotIn("error", result)
 
-    def test_mute_buffers_ai_messages(self):
-        """AI-sourced messages are also buffered during mute."""
+    def test_mute_buffers_webhook_alert_messages(self):
+        """Alert messages pushed through /api/webhook are also buffered during mute."""
         self._activate_mute(60)
-        result = self.bridge.send("Alice", "AI 回复", source="ai")
-        self.assertTrue(result.get("buffered"), "AI message should be buffered during mute")
+        result = self.bridge.send("Alice", "告警", source="webhook:grafana")
+        self.assertTrue(result.get("buffered"), "Webhook alert should be buffered during mute")
 
     def test_mute_keepalive_bypasses_mute(self):
         """Keepalive reminders must go through even when muted."""

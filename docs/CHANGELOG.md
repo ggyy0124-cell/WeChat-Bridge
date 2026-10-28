@@ -4,6 +4,28 @@
 
 ## [Unreleased]
 
+## [1.4.0-0.2] - 2026-10-28
+
+本版本把 WeChat Bridge 收窄为"对外推送微信消息 + 微信内置指令"：收到的微信消息只记录在管理面板中，不再自动回复、不再转发给外部服务。
+
+### Removed
+- 移除内置 AI 助手：删除 `app/ai_chat.py`，微信指令 `/ai`、`/retry`、`/clear`，接口 `POST /api/ai_analyze`，管理面板的「智能回复助手」设置，环境变量 `AI_ENABLED`、`AI_PROVIDER`、`AI_MODEL`、`AI_BASE_URL`、`AI_API_KEY` 不再生效
+- 移除插件系统：删除 `app/plugin_base.py`、`app/webhook_manager.py` 与 `examples/` 下的全部插件（书籍、天气与回显、会话式便签、消息转发），相应指令 `/书籍`、`/book`、`/找书`、`/findbook`、`/导入书籍`、`/importbook`、`/天气`、`/echo`、`/note`、`/exit` 不再提供；删除接口 `POST /api/commands/run`、`GET|POST /api/weather/query`；删除插件开发指南；环境变量 `FORWARD_URLS` 及天气、书籍插件的环境变量不再生效
+- 移除 Webhook 消息转发（收到微信消息后 POST 给外部地址）：删除管理面板的「外部 Webhook」设置，环境变量 `WEBHOOK_URL`、`WEBHOOK_ENABLED`、`WEBHOOK_MODE`、`WEBHOOK_TIMEOUT` 不再生效；删除异步回写指南与 Webhook 示例文档
+- 移除外部服务登记指令：删除接口 `POST /api/register_commands`、`POST /api/unregister_commands`，`/help` 不再显示「扩展指令」
+- 删除接口 `POST /api/ag_inbox`（外部程序拉取收到的文字消息）
+
+### Changed
+- 不认识的 `/指令` 一律回复「未知指令」；普通文字消息只记录，不回复、不显示"正在输入"
+- `GET /api/events` 只推送事件类型（`{"event": "message_received"}`），不再携带消息内容，仅供管理面板实时刷新；消息内容通过 `GET /api/messages` 读取
+- 管理面板的系统设置接口由 `/api/ai_config` 改为 `/api/settings`，只读写保活提醒时间
+- 旧配置文件（`AI_CONFIG_FILE`，默认 `/data/ai_config.json`）中残留的 AI 与 Webhook 字段在加载时丢弃，下次保存设置时从文件中清除；文件路径与环境变量名保持不变
+
+### Upgrade notes
+- 推送接口（`/api/send`、`/api/push`、`/api/send_image`、`/api/send_file`、`/api/send_video`、`/api/send_voice`、`/api/send_reference`、`/api/webhook`）、内置指令、保活提醒、受阻缓存与 `/pull` 补拉不变，升级无需修改调用方
+- 仍在调用上述已删除接口的程序会收到 404
+- 部署配置中残留的 `AI_*`、`WEBHOOK_*`、`FORWARD_URLS` 等环境变量可以删除，保留也不会报错
+
 ## [1.4.0-0.1] - 2026-10-20
 
 基于上游 [yuuouu/WeChat-Bridge](https://github.com/yuuouu/WeChat-Bridge) v1.4.0 的下游分支首个版本，版本号格式为「上游版本号 - 本分支修订号」。

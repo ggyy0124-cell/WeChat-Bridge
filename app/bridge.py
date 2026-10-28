@@ -19,28 +19,19 @@ import uuid
 from collections import deque
 from collections.abc import Callable
 
-import requests
-
-import config as cfg
 import db
 import media
 from account_identity import account_storage_dir_name
-from commands import MAGIC_WEBHOOK_COMMAND_PREFIX, CommandMixin
+from commands import CommandMixin
 from delivery import (  # noqa: F401 — re-export for backward compat
     MAX_CONSECUTIVE_SENDS,
     PULL_CHUNK_LIMIT,
     WINDOW_DEADLINE_SECONDS,
     DeliveryMixin,
 )
-from event_bus import (
-    EVENT_MESSAGE_RECEIVED,
-    Event,
-    EventBus,
-)
+from event_bus import EVENT_MESSAGE_RECEIVED, Event, EventBus
 from ilink import ILinkClient, ILinkSessionPausedError, format_reference_fallback_text
 from keepalive import KeepaliveMixin
-from plugin_base import PluginRegistry
-from webhook_manager import discover_and_register_plugins
 
 logger = logging.getLogger(__name__)
 
@@ -82,16 +73,12 @@ class WeChatBridge(DeliveryMixin, CommandMixin, KeepaliveMixin):
         self._start_time = time.time()
         self.activity_tracker: dict[str, dict] = {}
         self.recent_messages = deque(maxlen=50)
-        self.ag_inbox = []
-        self._ag_inbox_lock = threading.Lock()
         self._running = False
         self._poll_thread: threading.Thread | None = None
         self._pending_cleanup_thread: threading.Thread | None = None
         self._last_pending_cleanup_at = 0
         self._last_media_cleanup_at = 0
-        self.ai_manager = None
         self._consecutive_send_count: dict[str, dict] = {}
-        self._webhook_commands: dict[str, str] = {}  # 外部服务注册的命令 {"/todo": "记录待办"}
         self._mute_until: dict[str, float] = {}  # 用户静默截止时间 {user_id: timestamp}
         self._outbound_lock = threading.Lock()
         self._contacts_lock = threading.Lock()
@@ -101,9 +88,6 @@ class WeChatBridge(DeliveryMixin, CommandMixin, KeepaliveMixin):
         self._load_contacts()
 
         self.event_bus = EventBus()
-        self.plugin_registry = PluginRegistry(self.event_bus, send_func=self.send, bridge=self)
-        discover_and_register_plugins(self.plugin_registry)
-        self.plugin_registry.start_all()
 
     def _setup_data_dir(self, bot_id: str | None = None):
         """根据稳定账号标识设置数据目录，实现多账号数据隔离。"""
@@ -288,28 +272,6 @@ class WeChatBridge(DeliveryMixin, CommandMixin, KeepaliveMixin):
             context_token_at=context_token_at,
         )
 
-    def _get_webhook_config(self) -> dict:
-        current = cfg.load_config()
-        enabled = bool(current.get("webhook_enabled")) and bool(current.get("webhook_url"))
-        return {
-            "enabled": enabled,
-            "url": current.get("webhook_url", "").strip(),
-            "mode": current.get("webhook_mode", "unknown_command"),
-            "timeout": current.get("webhook_timeout", 5),
-        }
-
-    def _should_forward_unknown_command(self) -> bool:
-        webhook_cfg = self._get_webhook_config()
-        return webhook_cfg["enabled"] and webhook_cfg["mode"] in ("unknown_command", "all_messages")
-
-    def _should_forward_message(self, *, is_command: bool) -> bool:
-        webhook_cfg = self._get_webhook_config()
-        if not webhook_cfg["enabled"]:
-            return False
-        if webhook_cfg["mode"] == "all_messages":
-            return True
-        return is_command and webhook_cfg["mode"] == "unknown_command"
-
     def find_user_id(self, name_or_id: str) -> str | None:
         """通过名称或 ID 查找 user_id。"""
         if not name_or_id:
@@ -328,10 +290,6 @@ class WeChatBridge(DeliveryMixin, CommandMixin, KeepaliveMixin):
 
     def _contact_name(self, user_id: str, fallback: str = "") -> str:
         return self.contacts.get(user_id, fallback or user_id.split("@")[0])
-
-    def _account_scoped_user_id(self, user_id: str) -> str:
-        bot_id = self.client.get_bot_id() or ""
-        return f"{bot_id}:{user_id}" if bot_id else user_id
 
     # ── 持久化与状态 ──
 
@@ -848,37 +806,6 @@ class WeChatBridge(DeliveryMixin, CommandMixin, KeepaliveMixin):
         res = " ".join(parts) if parts else "[空消息]"
         return res.strip() if parts else res
 
-    def _trigger_webhook(self, from_user: str, from_name: str, text: str, msg: dict, *, is_command: bool = False):
-        """将消息通过标准 Webhook 转发给外部系统。"""
-        webhook_cfg = self._get_webhook_config()
-        if not self._should_forward_message(is_command=is_command):
-            return
-        command_name = ""
-        command_args = ""
-        if is_command and text.startswith("/"):
-            parts = text.strip().split(maxsplit=1)
-            command_name = parts[0].lower()
-            command_args = parts[1] if len(parts) > 1 else ""
-        payload = {
-            "source": "wechat-bridge",
-            "from_user": from_user,
-            "from_name": from_name,
-            "text": text,
-            "msg_id": self._message_id(msg),
-            "message_id": self._message_id(msg),
-            "reference": msg.get("_reference_context"),
-            "timestamp": int(time.time()),
-            "msg_type": msg.get("message_type"),
-            "is_command": is_command,
-            "command": command_name,
-            "args": command_args,
-        }
-        try:
-            requests.post(webhook_cfg["url"], json=payload, timeout=webhook_cfg["timeout"])
-            logger.info("已触发外部 Webhook: %s", webhook_cfg["url"])
-        except Exception as exc:
-            logger.warning("外部 Webhook 触发失败: %s", exc)
-
     def process_message(self, msg: dict):
         """处理单条收到的消息。"""
         logger.debug("RAW INBOUND: %s", json.dumps(msg, ensure_ascii=False))
@@ -948,121 +875,28 @@ class WeChatBridge(DeliveryMixin, CommandMixin, KeepaliveMixin):
             }
         )
 
-        if text and not text.startswith("/"):
-            with self._ag_inbox_lock:
-                self.ag_inbox.append({"from": from_name, "text": text})
+        # 通知管理面板刷新消息列表（只发信号，不带消息内容）
+        self.event_bus.publish(Event(EVENT_MESSAGE_RECEIVED, {"bot_id": self.client.get_bot_id() or ""}))
 
-        # 派发基础消息事件
-        self.event_bus.publish(
-            Event(
-                EVENT_MESSAGE_RECEIVED,
-                {
-                    "bot_id": self.client.get_bot_id() or "",
-                    "from_user": from_user,
-                    "from_name": from_name,
-                    "text": text,
-                    "msg": msg,
-                    "media_paths": media_paths,
-                },
-            )
-        )
-
-        if text.startswith("/"):
-            cmd_reply = self._handle_command(text, from_user)
-            if cmd_reply == "":
-                # 插件已自行处理回复
-                return
-            if cmd_reply == "__MAGIC_PULL__":
-
-                def _async_pull_worker():
-                    result = self.pull_pending_messages(from_user)
-                    if result.get("empty"):
-                        self.send(from_user, result["message"], source="system")
-                    elif not result.get("ok") and result.get("remaining", 0) > 0:
-                        logger.warning("缓存补拉中断，剩余 %d 条待发送", result["remaining"])
-
-                threading.Thread(target=_async_pull_worker, daemon=True).start()
-                return
-
-            if cmd_reply.startswith("__MAGIC_RETRY__:"):
-                retry_text = cmd_reply[len("__MAGIC_RETRY__:") :]
-
-                def _async_retry_worker():
-                    try:
-                        self.send(from_user, "## 🔄 正在重试\n\n- 正在为您重新生成回答", source="system")
-                        ai_key = self._account_scoped_user_id(from_user)
-                        ai_reply = self.ai_manager.chat(ai_key, retry_text) if self.ai_manager else ""
-                        if ai_reply:
-                            result = self.send(from_user, ai_reply, source="ai")
-                            if not result.get("ok"):
-                                logger.error("Retry 重试回复失败: %s", result.get("error"))
-                    except Exception as exc:
-                        logger.error("Retry 重试失败: %s", exc)
-
-                threading.Thread(target=_async_retry_worker, daemon=True).start()
-                return
-
-            if cmd_reply.startswith(MAGIC_WEBHOOK_COMMAND_PREFIX):
-
-                def _async_command_webhook_worker():
-                    self._trigger_webhook(from_user, from_name, text, msg, is_command=True)
-
-                threading.Thread(target=_async_command_webhook_worker, daemon=True).start()
-                return
-
-            result = self.send(from_user, cmd_reply, source="command")
-            if not result.get("ok"):
-                logger.error("指令回复失败: %s", result.get("error"))
+        if not text.startswith("/"):
             return
 
-        # 非命令消息触发旧 Webhook（兼容）
-        self._trigger_webhook(from_user, from_name, text, msg)
+        cmd_reply = self._handle_command(text, from_user)
+        if cmd_reply == "__MAGIC_PULL__":
 
-        # 插件持有该用户会话时（如便签收集中），跳过 AI
-        if self.plugin_registry.find_session_holder(from_user):
-            logger.debug("插件持有用户 [%s] 会话，跳过 AI", from_user[:16])
+            def _async_pull_worker():
+                result = self.pull_pending_messages(from_user)
+                if result.get("empty"):
+                    self.send(from_user, result["message"], source="system")
+                elif not result.get("ok") and result.get("remaining", 0) > 0:
+                    logger.warning("缓存补拉中断，剩余 %d 条待发送", result["remaining"])
+
+            threading.Thread(target=_async_pull_worker, daemon=True).start()
             return
 
-        if self.ai_manager and text and not text.startswith("/"):
-
-            def _async_ai_worker(uid, msg_text):
-                try:
-                    self.send_typing(uid)
-                    chunk_buffer = ""
-                    first_send = True
-                    # 缓冲块，尽量一次性发送，防止碎消息刷屏，微信单条限制约 5200 字符
-                    ai_key = self._account_scoped_user_id(uid)
-                    for chunk in self.ai_manager.chat_stream(ai_key, msg_text):
-                        chunk_buffer += chunk
-                        # 超过 4500 字且遇到换行，或者极限达到 5000 字时，分段发送
-                        if len(chunk_buffer) >= 5000 or (len(chunk_buffer) >= 4500 and "\n\n" in chunk):
-                            prefix = "🤖 " if first_send else ""
-                            result = self.send(uid, f"{prefix}{chunk_buffer}", source="ai")
-                            if not result.get("ok"):
-                                logger.error("AI 后台回复片段失败 [%s]: %s", uid[:16], result.get("error"))
-                            first_send = False
-                            chunk_buffer = ""
-                            self.send_typing(uid)  # 继续打字状态
-
-                    if chunk_buffer:
-                        prefix = "🤖 " if first_send else ""
-                        result = self.send(uid, f"{prefix}{chunk_buffer}", source="ai")
-                        if not result.get("ok"):
-                            logger.error("AI 后台回复最后片段失败 [%s]: %s", uid[:16], result.get("error"))
-
-                    logger.info("AI 流式回复已发送完毕 [%s]", uid[:16])
-                except Exception as exc:
-                    logger.error("AI 后台回复处理失败 [%s]: %s", uid[:16], exc)
-                    try:
-                        self.send(uid, f"⚠️ AI 响应异常: {str(exc)[:50]}", source="system")
-                    except Exception:
-                        pass
-
-            threading.Thread(
-                target=_async_ai_worker,
-                args=(from_user, text),
-                daemon=True,
-            ).start()
+        result = self.send(from_user, cmd_reply, source="command")
+        if not result.get("ok"):
+            logger.error("指令回复失败: %s", result.get("error"))
 
     # ── 发送消息 ──
 
@@ -1423,11 +1257,6 @@ class WeChatBridge(DeliveryMixin, CommandMixin, KeepaliveMixin):
             except Exception as exc:
                 logger.warning("iLink notifyStop 失败，继续关闭: %s", exc)
         self._running = False
-        if getattr(self, "plugin_registry", None):
-            try:
-                self.plugin_registry.stop_all()
-            except Exception as e:
-                logger.error("停止插件失败: %s", e)
         if getattr(self, "_poll_thread", None):
             self._poll_thread.join(timeout=10)
         if getattr(self, "_keepalive_thread", None):

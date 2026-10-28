@@ -1,7 +1,7 @@
 """config 模块单元测试。
 
-覆盖：默认配置加载、环境变量覆盖、Webhook 参数校验、keepalive 旧字段迁移、
-已移除遥测开关的旧配置清理、save_config 自动创建目录、get_provider_info 兜底。
+覆盖：默认配置加载、keepalive 旧字段迁移、已移除功能（遥测、AI 助手、Webhook 转发）
+在旧配置中残留字段的清理、save_config 自动创建目录。
 """
 
 import json
@@ -35,108 +35,7 @@ class LoadConfigDefaultsTests(unittest.TestCase):
     @patch.dict(os.environ, {}, clear=True)
     def test_returns_defaults_when_no_file_and_no_env(self):
         config = cfg.load_config()
-        self.assertFalse(config["enabled"])
-        self.assertEqual(config["provider"], "openai")
-        self.assertEqual(config["model"], "gpt-4o-mini")
-        self.assertEqual(config["api_key"], "")
-        self.assertEqual(config["webhook_mode"], "all_messages")
-        self.assertEqual(config["webhook_timeout"], 5)
-        self.assertEqual(config["keepalive_remind_minutes"], 1380)
-
-
-class EnvOverrideTests(unittest.TestCase):
-    """环境变量可以覆盖配置文件和默认值。"""
-
-    def setUp(self):
-        cfg._invalidate_config_cache()
-        self.tempdir = tempfile.TemporaryDirectory()
-        self._orig = cfg.CONFIG_FILE
-        cfg.CONFIG_FILE = str(Path(self.tempdir.name) / "ai_config.json")
-
-    def tearDown(self):
-        cfg.CONFIG_FILE = self._orig
-        self.tempdir.cleanup()
-
-    @patch.dict(
-        os.environ,
-        {
-            "AI_API_KEY": "sk-test-key",
-            "AI_PROVIDER": "gemini",
-            "AI_MODEL": "gemini-2.0-flash",
-            "AI_ENABLED": "true",
-        },
-        clear=False,
-    )
-    def test_env_vars_override_defaults(self):
-        config = cfg.load_config()
-        self.assertEqual(config["api_key"], "sk-test-key")
-        self.assertEqual(config["provider"], "gemini")
-        self.assertEqual(config["model"], "gemini-2.0-flash")
-        self.assertTrue(config["enabled"])
-
-    @patch.dict(os.environ, {"AI_BASE_URL": "https://llm.example.com/v1"}, clear=False)
-    def test_ai_base_url_env_var_overrides_defaults(self):
-        config = cfg.load_config()
-        self.assertEqual(config["base_url"], "https://llm.example.com/v1")
-
-    @patch.dict(
-        os.environ,
-        {
-            "WEBHOOK_URL": "https://example.com/hook",
-            "WEBHOOK_ENABLED": "true",
-            "WEBHOOK_MODE": "all_messages",
-            "WEBHOOK_TIMEOUT": "10",
-        },
-        clear=False,
-    )
-    def test_webhook_env_vars(self):
-        config = cfg.load_config()
-        self.assertEqual(config["webhook_url"], "https://example.com/hook")
-        self.assertTrue(config["webhook_enabled"])
-        self.assertEqual(config["webhook_mode"], "all_messages")
-        self.assertEqual(config["webhook_timeout"], 10)
-
-
-class WebhookValidationTests(unittest.TestCase):
-    """Webhook 参数校验边界场景。"""
-
-    def setUp(self):
-        cfg._invalidate_config_cache()
-        self.tempdir = tempfile.TemporaryDirectory()
-        self._orig = cfg.CONFIG_FILE
-        cfg.CONFIG_FILE = str(Path(self.tempdir.name) / "ai_config.json")
-
-    def tearDown(self):
-        cfg.CONFIG_FILE = self._orig
-        self.tempdir.cleanup()
-
-    def test_invalid_webhook_mode_falls_back_to_all_messages(self):
-        cfg.save_config({**cfg.DEFAULT_CONFIG, "webhook_mode": "invalid_mode"})
-        config = cfg.load_config()
-        self.assertEqual(config["webhook_mode"], "all_messages")
-
-    def test_webhook_timeout_clamped_to_range(self):
-        cfg.save_config({**cfg.DEFAULT_CONFIG, "webhook_timeout": 999})
-        config = cfg.load_config()
-        self.assertEqual(config["webhook_timeout"], 30)
-
-        cfg.save_config({**cfg.DEFAULT_CONFIG, "webhook_timeout": -5})
-        config = cfg.load_config()
-        self.assertEqual(config["webhook_timeout"], 1)
-
-    def test_webhook_url_only_implies_enabled(self):
-        """旧配置文件仅有 URL 但无 webhook_enabled 字段时，应默认开启（向后兼容）。"""
-        old_config = {k: v for k, v in cfg.DEFAULT_CONFIG.items() if k != "webhook_enabled"}
-        old_config["webhook_url"] = "https://example.com/hook"
-        cfg.save_config(old_config)
-        config = cfg.load_config()
-        self.assertTrue(config["webhook_enabled"])
-
-    def test_explicit_webhook_disabled_not_overridden(self):
-        """用户明确关闭 webhook 后，即使 URL 非空也不应被覆盖为 True。"""
-        cfg.save_config({**cfg.DEFAULT_CONFIG, "webhook_enabled": False, "webhook_url": "https://example.com/hook"})
-        config = cfg.load_config()
-        self.assertFalse(config["webhook_enabled"])
+        self.assertEqual(config, {"keepalive_remind_minutes": 1380})
 
 
 class KeepaliveMigrationTests(unittest.TestCase):
@@ -205,6 +104,57 @@ class RemovedTelemetryKeyTests(unittest.TestCase):
             self.assertNotIn("telemetry_enabled", json.load(f))
 
 
+LEGACY_AI_AND_WEBHOOK = {
+    "enabled": True,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "api_key": "sk-legacy",
+    "base_url": "",
+    "system_prompt": "旧提示词",
+    "max_history": 10,
+    "max_tokens_per_day": 100000,
+    "usage": {"2026-10-27": {"tokens": 1, "requests": 1}},
+    "webhook_enabled": True,
+    "webhook_url": "http://127.0.0.1:18082/webhook",
+    "webhook_mode": "all_messages",
+    "webhook_timeout": 5,
+}
+
+
+class RemovedAIAndWebhookKeyTests(unittest.TestCase):
+    """AI 助手与 Webhook 转发已移除：旧配置文件和环境变量里的相关设置不再生效，也不再保存。"""
+
+    def setUp(self):
+        cfg._invalidate_config_cache()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self._orig = cfg.CONFIG_FILE
+        cfg.CONFIG_FILE = str(Path(self.tempdir.name) / "ai_config.json")
+        with open(cfg.CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump({**LEGACY_AI_AND_WEBHOOK, "keepalive_remind_minutes": 600}, f)
+
+    def tearDown(self):
+        cfg.CONFIG_FILE = self._orig
+        self.tempdir.cleanup()
+
+    @patch.dict(
+        os.environ,
+        {
+            "AI_API_KEY": "sk-env",
+            "AI_ENABLED": "true",
+            "WEBHOOK_URL": "https://example.com/hook",
+            "WEBHOOK_ENABLED": "true",
+        },
+        clear=False,
+    )
+    def test_legacy_keys_and_env_vars_are_dropped_on_load(self):
+        self.assertEqual(cfg.load_config(), {"keepalive_remind_minutes": 600})
+
+    def test_legacy_keys_are_not_persisted_again(self):
+        cfg.save_config(cfg.load_config())
+        with open(cfg.CONFIG_FILE, encoding="utf-8") as f:
+            self.assertEqual(json.load(f), {"keepalive_remind_minutes": 600})
+
+
 class SaveConfigTests(unittest.TestCase):
     """save_config 应创建目录并正确写入 JSON。"""
 
@@ -220,35 +170,11 @@ class SaveConfigTests(unittest.TestCase):
     def test_creates_missing_directory(self):
         nested_path = str(Path(self.tempdir.name) / "sub" / "dir" / "ai_config.json")
         cfg.CONFIG_FILE = nested_path
-        cfg.save_config({"enabled": True})
+        cfg.save_config({"keepalive_remind_minutes": 60})
         self.assertTrue(os.path.exists(nested_path))
         with open(nested_path) as f:
             data = json.load(f)
-        self.assertTrue(data["enabled"])
-
-
-class ProviderInfoTests(unittest.TestCase):
-    """get_provider_info 应返回正确的预设或兜底 OpenAI。"""
-
-    def test_known_provider(self):
-        info = cfg.get_provider_info("gemini")
-        self.assertEqual(info["name"], "Google Gemini")
-        self.assertTrue(len(info["models"]) > 0)
-
-    def test_unknown_provider_falls_back_to_openai(self):
-        info = cfg.get_provider_info("nonexistent")
-        self.assertEqual(info["name"], "OpenAI")
-
-    def test_claude_has_anthropic_sdk_flag(self):
-        info = cfg.get_provider_info("claude")
-        self.assertEqual(info["sdk"], "anthropic")
-
-    def test_minimax_provider_uses_openai_compatible_defaults(self):
-        info = cfg.get_provider_info("minimax")
-        self.assertEqual(info["name"], "MiniMax")
-        self.assertEqual(info["base_url"], "https://api.minimax.io/v1")
-        self.assertEqual(info["max_tokens_param"], "max_completion_tokens")
-        self.assertEqual(info["models"][0]["id"], "MiniMax-M2.7")
+        self.assertEqual(data["keepalive_remind_minutes"], 60)
 
 
 if __name__ == "__main__":

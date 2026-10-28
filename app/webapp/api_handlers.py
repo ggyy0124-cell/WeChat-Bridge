@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import hmac
-import importlib.util
 import json
 import logging
 import mimetypes
@@ -13,11 +12,9 @@ import queue
 import tempfile
 import time
 import uuid
-from pathlib import Path
 from urllib.parse import parse_qs
 
 import config as cfg
-import db
 import media as media_mod
 from version import __version__
 from webapp.auth import check_web_session, make_session_cookie
@@ -27,7 +24,6 @@ from webapp.ui.qr_page import _url_to_qr_base64
 from webapp.webhook_parser import parse_webhook_payload
 
 logger = logging.getLogger(__name__)
-_weather_module = None
 
 
 def _pick_default_contact(
@@ -139,114 +135,6 @@ def _split_account_target(ctx, default_bridge, target: str):
     if runtime is None or not runtime.client.logged_in:
         return default_bridge, target, None
     return runtime.bridge, contact_ref, runtime.bot_id
-
-
-def _normalize_command(command: str) -> str:
-    command = str(command or "").strip().split()[0].lower()
-    if command and not command.startswith("/"):
-        command = f"/{command}"
-    return command
-
-
-def _run_bridge_command(
-    ctx, default_bridge, target: str, command: str, args: str = "", *, source: str = "api_command"
-) -> dict:
-    bridge, resolved_target, routed_bot_id = _split_account_target(ctx, default_bridge, target)
-    resolved_user = bridge.find_user_id(resolved_target)
-    if not resolved_user:
-        return {
-            "ok": False,
-            "error": f"找不到联系人「{resolved_target}」。对方需先给你发过消息才会出现在联系人列表中",
-            "resolved_to": resolved_target,
-            **({"bot_id": routed_bot_id} if routed_bot_id else {}),
-        }
-
-    normalized_command = _normalize_command(command)
-    plugin_registry = getattr(bridge, "plugin_registry", None)
-    plugin = plugin_registry.route_command(normalized_command, resolved_user) if plugin_registry else None
-    if not plugin:
-        return {
-            "ok": False,
-            "error": f"未注册命令: {normalized_command}",
-            "resolved_to": resolved_user,
-            **({"bot_id": routed_bot_id} if routed_bot_id else {}),
-        }
-
-    command_args = str(args or "").strip()
-    text = f"{normalized_command} {command_args}".strip()
-    bot_id = bridge.client.get_bot_id() if hasattr(bridge, "client") else ""
-    payload = {
-        "from_user": resolved_user,
-        "from_name": bridge._contact_name(resolved_user),
-        "text": text,
-        "command": normalized_command,
-        "args": command_args,
-        "is_command": True,
-        "bot_id": bot_id,
-        "is_default": bot_id == (db.get_default_bot_id() or ""),
-        "source": source,
-        "msg_id": f"api-command-{uuid.uuid4().hex[:12]}",
-        "timestamp": int(time.time()),
-    }
-    accepted = bridge.plugin_registry.dispatch_command(plugin, payload)
-    return {
-        "ok": bool(accepted),
-        "command": normalized_command,
-        "args": command_args,
-        "plugin": plugin.name,
-        "resolved_to": resolved_user,
-        **({"bot_id": routed_bot_id or bot_id} if (routed_bot_id or bot_id) else {}),
-        **({} if accepted else {"error": "插件执行失败"}),
-    }
-
-
-def _load_weather_module():
-    global _weather_module
-    if _weather_module is not None:
-        return _weather_module
-
-    project_root = Path(__file__).resolve().parents[2]
-    module_path = project_root / "examples" / "webhook_receiver.py"
-    if not module_path.exists():
-        # 兼容 Docker 挂载情况 (./app:/app, ./examples:/app/examples)
-        module_path = Path(__file__).resolve().parents[1] / "examples" / "webhook_receiver.py"
-    if not module_path.exists():
-        raise RuntimeError("找不到天气插件模块")
-
-    spec = importlib.util.spec_from_file_location("bridge_weather_receiver", module_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("无法加载天气插件模块")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    _weather_module = module
-    return module
-
-
-def _query_weather_snapshot(city: str, *, force_refresh: bool = False, include_minutely=None) -> dict:
-    module = _load_weather_module()
-    if not hasattr(module, "build_weather_snapshot"):
-        raise RuntimeError("天气插件未提供结构化查询能力")
-    return module.build_weather_snapshot(city, force_refresh=force_refresh, include_minutely=include_minutely)
-
-
-def _weather_error_payload(exc: Exception) -> dict:
-    payload = {"ok": False, "error": str(exc)}
-    candidates = getattr(exc, "candidates", None)
-    if candidates:
-        payload["candidates"] = candidates
-    status_code = getattr(exc, "status_code", None)
-    if status_code:
-        payload["status_code"] = status_code
-    return payload
-
-
-def _weather_error_status(exc: Exception) -> int:
-    if getattr(exc, "candidates", None):
-        return 400
-    status_code = getattr(exc, "status_code", None)
-    if status_code in {400, 401, 402, 403, 404, 429}:
-        return int(status_code)
-    return 500
 
 
 def _send_target(
@@ -510,32 +398,6 @@ def handle_account_qr(handler, ctx, params, body):
         handler._json_response({"ok": False, "error": str(exc)}, 500)
 
 
-def handle_ai_analyze(handler, ctx, params, body):
-    if not handler._check_api_token():
-        return
-    data = _load_json(handler, body)
-    if data is None:
-        return
-    prompt = str(data.get("prompt") or data.get("text") or data.get("content") or "").strip()
-    system_prompt = str(data.get("system_prompt") or "").strip() or None
-    if not prompt:
-        handler._json_response({"ok": False, "error": "缺少 prompt"}, 400)
-        return
-    ai_manager = None
-    if ctx.account_manager is not None:
-        ai_manager = ctx.account_manager.ai_manager
-    elif ctx.bridge is not None:
-        ai_manager = ctx.bridge.ai_manager
-    if ai_manager is None:
-        handler._json_response({"ok": False, "error": "AI 未启用"}, 400)
-        return
-    try:
-        result = ai_manager.one_shot(prompt, system_prompt=system_prompt)
-        handler._json_response({"ok": True, "result": result, "text": result})
-    except Exception as exc:
-        handler._json_response({"ok": False, "error": str(exc)}, 500)
-
-
 def handle_account_remark(handler, ctx, params, body):
     if not handler._check_api_token():
         return
@@ -696,18 +558,12 @@ def handle_delivery(handler, ctx, params):
     )
 
 
-def handle_get_ai_config(handler, ctx, params):
+def handle_get_settings(handler, ctx, params):
     if not ctx.any_logged_in():
         handler._json_response({"error": "未登录"}, 401)
         return
-
-    ai_config = cfg.load_config()
-    key = ai_config.get("api_key", "")
-    if len(key) > 12:
-        ai_config["api_key"] = key[:4] + "********" + key[-4:]
-    elif len(key) > 0:
-        ai_config["api_key"] = "********"
-    handler._json_response(ai_config)
+    current = cfg.load_config()
+    handler._json_response({"keepalive_remind_minutes": current.get("keepalive_remind_minutes", 1380)})
 
 
 def handle_qr_status(handler, ctx, params):
@@ -917,87 +773,6 @@ def handle_send_post(handler, ctx, params, body):
     handler._json_response(result, 200 if result.get("ok") else 400)
 
 
-def handle_weather_query_get(handler, ctx, params):
-    if not handler._check_api_token():
-        return
-    city = str(params.get("city", [""])[0] or params.get("q", [""])[0]).strip()
-    if not city:
-        handler._json_response({"ok": False, "error": "缺少 city 参数"}, 400)
-        return
-    try:
-        force_refresh = (
-            _truthy_param(params, "force")
-            or _truthy_param(params, "refresh")
-            or _truthy_param(params, "latest")
-            or _truthy_param(params, "no_cache")
-        )
-        include_minutely = _bool_value(params.get("include_minutely", [""])[0], None)
-        handler._json_response(
-            {
-                "ok": True,
-                "weather": _query_weather_snapshot(
-                    city, force_refresh=force_refresh, include_minutely=include_minutely
-                ),
-            }
-        )
-    except Exception as exc:
-        logger.warning("天气结构化查询失败 [%s]: %s", city, exc)
-        handler._json_response(_weather_error_payload(exc), _weather_error_status(exc))
-
-
-def handle_weather_query_post(handler, ctx, params, body):
-    if not handler._check_api_token():
-        return
-    data = _load_json(handler, body)
-    if data is None:
-        return
-    city = str(data.get("city") or data.get("q") or "").strip()
-    if not city:
-        handler._json_response({"ok": False, "error": "缺少 city 参数"}, 400)
-        return
-    try:
-        force_refresh = any(_bool_value(data.get(name), False) for name in ("force", "refresh", "latest", "no_cache"))
-        include_minutely = _bool_value(data.get("include_minutely"), None)
-        handler._json_response(
-            {
-                "ok": True,
-                "weather": _query_weather_snapshot(
-                    city, force_refresh=force_refresh, include_minutely=include_minutely
-                ),
-            }
-        )
-    except Exception as exc:
-        logger.warning("天气结构化查询失败 [%s]: %s", city, exc)
-        handler._json_response(_weather_error_payload(exc), _weather_error_status(exc))
-
-
-def handle_run_command(handler, ctx, params, body):
-    if not handler._check_api_token():
-        return
-
-    data = _load_json(handler, body)
-    if data is None:
-        return
-    runtime = _resolve_runtime(handler, ctx, params, data, require_logged_in=True)
-    if runtime is None:
-        return
-
-    target = str(data.get("to") or data.get("target") or "").strip()
-    command = _normalize_command(str(data.get("command") or ""))
-    args = str(data.get("args") or "").strip()
-    source = str(data.get("source") or "api_command").strip() or "api_command"
-
-    if not target:
-        handler._json_response({"ok": False, "error": "缺少 to 参数"}, 400)
-        return
-    if not command:
-        handler._json_response({"ok": False, "error": "缺少 command 参数"}, 400)
-        return
-
-    result = _run_bridge_command(ctx, runtime.bridge, target, command, args, source=source)
-    handler._json_response(result, 200 if result.get("ok") else 400)
-
-
 def handle_typing(handler, ctx, params, body):
     data = _load_json(handler, body)
     if data is None:
@@ -1018,7 +793,7 @@ def handle_typing(handler, ctx, params, body):
     handler._json_response(result, 200 if result.get("ok") else 400)
 
 
-def handle_post_ai_config(handler, ctx, params, body):
+def handle_post_settings(handler, ctx, params, body):
     if not ctx.any_logged_in():
         handler._json_response({"ok": False, "error": "未登录"}, 401)
         return
@@ -1027,56 +802,11 @@ def handle_post_ai_config(handler, ctx, params, body):
     if data is None:
         return
 
-    original = cfg.load_config()
-    current = original.copy()
-    for key in (
-        "enabled",
-        "provider",
-        "model",
-        "base_url",
-        "system_prompt",
-        "max_history",
-        "keepalive_remind_minutes",
-        "webhook_enabled",
-        "webhook_url",
-        "webhook_mode",
-        "webhook_timeout",
-    ):
-        if key in data:
-            current[key] = data[key]
-
-    if "api_key" in data:
-        new_key = data["api_key"].strip()
-        if "*" not in new_key:
-            current["api_key"] = new_key
-
-    if "webhook_url" in current:
-        current["webhook_url"] = current["webhook_url"].strip()
-    if current.get("webhook_mode") not in ("unknown_command", "all_messages"):
-        current["webhook_mode"] = "unknown_command"
-    try:
-        current["webhook_timeout"] = max(1, min(30, int(current.get("webhook_timeout", 5))))
-    except (TypeError, ValueError):
-        current["webhook_timeout"] = 5
-
-    cfg.save_config(current)
-    if ctx.account_manager is not None:
-        for runtime in ctx.account_manager.runtimes.values():
-            if runtime.bridge.ai_manager:
-                runtime.bridge.ai_manager.clear_all_histories()
-    elif ctx.bridge and ctx.bridge.ai_manager:
-        ctx.bridge.ai_manager.clear_all_histories()
+    current = cfg.load_config()
+    if "keepalive_remind_minutes" in data:
+        current["keepalive_remind_minutes"] = data["keepalive_remind_minutes"]
+    cfg.save_config(cfg.validate_config(current))
     handler._json_response({"ok": True})
-
-
-def handle_ag_inbox(handler, ctx, params, body):
-    runtime = _resolve_runtime(handler, ctx, params, require_logged_in=True)
-    if runtime is None:
-        return
-    with runtime.bridge._ag_inbox_lock:
-        messages = runtime.bridge.ag_inbox
-        runtime.bridge.ag_inbox = []
-    handler._json_response({"ok": True, "messages": messages})
 
 
 def handle_logout(handler, ctx, params, body):
@@ -1514,84 +1244,6 @@ def handle_send_reference(handler, ctx, params, body):
     handler._json_response(result, 200 if result.get("ok") else 400)
 
 
-def handle_register_commands(handler, ctx, params, body):
-    """外部 Webhook 服务注册自定义命令到 /help 列表。"""
-    if not handler._check_api_token():
-        return
-
-    data = _load_json(handler, body)
-    if data is None:
-        return
-    runtime = _resolve_runtime(handler, ctx, params, data, require_logged_in=False)
-    if runtime is None:
-        return
-
-    commands = data.get("commands", [])
-    if not isinstance(commands, list) or not commands:
-        handler._json_response({"ok": False, "error": "需要 commands 数组"}, 400)
-        return
-
-    # 内置命令保护
-    builtin = {
-        "/help",
-        "/帮助",
-        "/status",
-        "/状态",
-        "/pull",
-        "/uid",
-        "/retry",
-        "/重试",
-        "/clear",
-        "/清除",
-        "/ai",
-        "/keepalive",
-        "/保活",
-        "/mute",
-    }
-    registered = []
-    for item in commands:
-        cmd = item.get("command", "").strip().lower()
-        desc = item.get("description", "").strip()
-        if not cmd or not cmd.startswith("/"):
-            continue
-        if cmd in builtin or cmd.startswith("/ai ") or cmd.startswith("/keepalive "):
-            continue
-        runtime.bridge._webhook_commands[cmd] = desc or cmd
-        registered.append(cmd)
-
-    logger.info("外部命令注册: %s", registered)
-    handler._json_response({"ok": True, "registered": registered})
-
-
-def handle_unregister_commands(handler, ctx, params, body):
-    """注销已注册的外部命令。"""
-    if not handler._check_api_token():
-        return
-
-    data = _load_json(handler, body)
-    if data is None:
-        return
-    runtime = _resolve_runtime(handler, ctx, params, data, require_logged_in=False)
-    if runtime is None:
-        return
-
-    commands = data.get("commands", [])
-    removed = []
-    if not commands:
-        # 空数组 = 清空全部
-        removed = list(runtime.bridge._webhook_commands.keys())
-        runtime.bridge._webhook_commands.clear()
-    else:
-        for cmd in commands:
-            cmd = cmd.strip() if isinstance(cmd, str) else ""
-            if cmd in runtime.bridge._webhook_commands:
-                del runtime.bridge._webhook_commands[cmd]
-                removed.append(cmd)
-
-    logger.info("外部命令注销: %s", removed)
-    handler._json_response({"ok": True, "removed": removed})
-
-
 def handle_events(handler, ctx, params):
     if not handler._check_api_token():
         return
@@ -1611,18 +1263,16 @@ def handle_events(handler, ctx, params):
         q.put(e)
 
     sid = str(uuid.uuid4())
-    from event_bus import EVENT_AI_REPLY_READY, EVENT_MESSAGE_RECEIVED, EVENT_MESSAGE_SENT
+    from event_bus import EVENT_MESSAGE_RECEIVED
 
     runtime.bridge.event_bus.subscribe(EVENT_MESSAGE_RECEIVED, _on_event, subscriber_id=sid)
-    runtime.bridge.event_bus.subscribe(EVENT_MESSAGE_SENT, _on_event, subscriber_id=sid)
-    runtime.bridge.event_bus.subscribe(EVENT_AI_REPLY_READY, _on_event, subscriber_id=sid)
 
     try:
         while True:
             try:
                 event = q.get(timeout=15)
-                # Ensure no non-serializable objects in event.data
-                data_str = json.dumps({"event": event.name, "data": event.data}, ensure_ascii=False)
+                # 只通知事件类型，供管理面板刷新；消息内容通过 /api/messages 读取
+                data_str = json.dumps({"event": event.name})
                 handler.wfile.write(f"data: {data_str}\n\n".encode())
                 handler.wfile.flush()
             except queue.Empty:
@@ -1632,5 +1282,3 @@ def handle_events(handler, ctx, params):
         logger.debug("SSE 客户端断开连接: %s", exc)
     finally:
         runtime.bridge.event_bus.unsubscribe(EVENT_MESSAGE_RECEIVED, sid)
-        runtime.bridge.event_bus.unsubscribe(EVENT_MESSAGE_SENT, sid)
-        runtime.bridge.event_bus.unsubscribe(EVENT_AI_REPLY_READY, sid)

@@ -14,13 +14,13 @@ $(PY):
 install-dev: $(PY)
 
 lint: $(PY)
-	$(RUFF) check app/ tests/ examples/
+	$(RUFF) check app/ tests/
 
 format: $(PY)
-	$(RUFF) format app/ tests/ examples/
+	$(RUFF) format app/ tests/
 
 format-check: $(PY)
-	$(RUFF) format --check app/ tests/ examples/
+	$(RUFF) format --check app/ tests/
 
 test: $(PY)
 	$(PYTEST) tests/ -v --cov=app --cov-report=term-missing

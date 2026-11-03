@@ -1,0 +1,36 @@
+.env.example
+  s_0458ec86146326::t_a9fd20a477f0d4 32-36
+docs/CHANGELOG.md
+  s_0458ec86146326::t_752ac72645d704 7-11
+app/delivery.py
+  s_0458ec86146326::t_ae416b439750f5 550,564-568
+  s_0458ec86146326::t_ef57024b6bcb47 57-61
+  s_0458ec86146326::t_1a0167c9e27626 651
+  s_0458ec86146326::t_30aa7ae1457614 206-218
+  s_0458ec86146326::t_3023c436185e3f 679-680
+  s_0458ec86146326::t_c55cf436761002 713
+  s_0458ec86146326::t_6d33c323cd7ebd 617-618
+  s_0458ec86146326::t_20f1f4d0870fd0 726
+tests/test_bridge_delivery.py
+  s_0458ec86146326::t_64412b14805498 148-313
+README.md
+  s_0458ec86146326::t_34916740b6847f 225-227
+docs/api-reference.md
+  s_0458ec86146326::t_3aa823e351ceaf 247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1581c70369f50621084c96c4b865c19f02d4bea6",
+  "prompts": {},
+  "sessions": {
+    "s_0458ec86146326": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "10ffc435-9f4a-4649-a9d0-3b588891de7f",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "ggyy0124-cell <281871942+ggyy0124-cell@users.noreply.github.com>"
+    }
+  }
+}

@@ -145,6 +145,172 @@ class BridgeDeliveryTests(unittest.TestCase):
         self.assertEqual(summary["pending_count"], 0)
         self.assertIsNotNone(summary["active_overflow_session_id"])
 
+    def test_ninth_message_appends_quota_notice_without_state_change(self):
+        for idx in range(8):
+            result = self.bridge.send("Alice", f"hello-{idx}")
+            self.assertTrue(result["ok"])
+            self.assertFalse(result["quota_notice"])
+            self.assertEqual(self.client.sent_texts[-1][1], f"hello-{idx}")
+
+        result = self.bridge.send("Alice", "hello-9")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["quota_notice"])
+        self.assertFalse(result["warning"])
+        self.assertIsNone(result["blocked_reason"])
+        self.assertIsNone(result["overflow_session_id"])
+        sent_text = self.client.sent_texts[-1][1]
+        self.assertTrue(sent_text.startswith("hello-9\n\n---"))
+        self.assertIn("## ⏳ 微信 bot 发送额度即将用尽", sent_text)
+        self.assertIn("本轮已发送 9/10 条，仅剩 1 条", sent_text)
+        self.assertIn("请现在回复任意内容续期", sent_text)
+        self.assertNotIn("10 条上限", sent_text)
+
+        summary = self.bridge.get_delivery_summary("uid-1")
+        self.assertEqual(summary["status"], "NORMAL")
+        self.assertEqual(summary["consecutive_send_count"], 9)
+        self.assertIsNone(summary["blocked_reason"])
+        self.assertIsNone(summary["active_overflow_session_id"])
+
+        saved = self.bridge.db.get_message_by_msg_id(result["message_id"])
+        self.assertTrue(saved["meta"]["quota_notice"])
+
+    def test_tenth_message_carries_only_limit_warning_not_quota_notice(self):
+        for idx in range(9):
+            self.bridge.send("Alice", f"hello-{idx}")
+
+        result = self.bridge.send("Alice", "hello-10")
+
+        self.assertTrue(result["warning"])
+        self.assertFalse(result["quota_notice"])
+        sent_text = self.client.sent_texts[-1][1]
+        self.assertIn("## ⚠️ 微信 bot 10 条上限", sent_text)
+        self.assertNotIn("额度即将用尽", sent_text)
+
+    def test_quota_notice_repeats_in_next_cycle_after_user_reply(self):
+        for idx in range(9):
+            self.bridge.send("Alice", f"hello-{idx}")
+        self.assertIn("额度即将用尽", self.client.sent_texts[-1][1])
+
+        self.bridge._mark_user_recovered("uid-1", int(time.time()))
+        self.assertEqual(self.bridge.get_delivery_summary("uid-1")["consecutive_send_count"], 0)
+
+        for idx in range(8):
+            result = self.bridge.send("Alice", f"again-{idx}")
+            self.assertFalse(result["quota_notice"])
+        result = self.bridge.send("Alice", "again-9")
+
+        self.assertTrue(result["quota_notice"])
+        self.assertIn("额度即将用尽", self.client.sent_texts[-1][1])
+
+    def test_quota_notice_can_be_disabled_with_zero(self):
+        with patch.object(delivery_module, "QUOTA_WARN_AT", 0):
+            for idx in range(9):
+                result = self.bridge.send("Alice", f"hello-{idx}")
+                self.assertFalse(result["quota_notice"])
+
+        self.assertTrue(all("额度即将用尽" not in sent[1] for sent in self.client.sent_texts))
+
+    def test_quota_notice_ignores_value_not_below_limit(self):
+        """QUOTA_WARN_AT >= 10 视为关闭，第 10 条仍只带原有的上限提醒。"""
+        with patch.object(delivery_module, "QUOTA_WARN_AT", delivery_module.MAX_CONSECUTIVE_SENDS):
+            for idx in range(10):
+                result = self.bridge.send("Alice", f"hello-{idx}")
+                self.assertFalse(result["quota_notice"])
+
+        self.assertTrue(all("额度即将用尽" not in sent[1] for sent in self.client.sent_texts))
+        self.assertIn("## ⚠️ 微信 bot 10 条上限", self.client.sent_texts[-1][1])
+
+    def test_quota_notice_position_is_configurable(self):
+        with patch.object(delivery_module, "QUOTA_WARN_AT", 5):
+            for idx in range(4):
+                self.assertFalse(self.bridge.send("Alice", f"hello-{idx}")["quota_notice"])
+            result = self.bridge.send("Alice", "hello-5")
+
+        self.assertTrue(result["quota_notice"])
+        self.assertIn("本轮已发送 5/10 条，仅剩 5 条", self.client.sent_texts[-1][1])
+
+    def test_quota_notice_is_not_duplicated_on_request_id_retry(self):
+        for idx in range(8):
+            self.bridge.send("Alice", f"hello-{idx}")
+
+        first = self.bridge.send("Alice", "hello-9", request_id="req-9")
+        retry = self.bridge.send("Alice", "hello-9", request_id="req-9")
+
+        self.assertTrue(first["quota_notice"])
+        self.assertTrue(retry["deduplicated"])
+        self.assertEqual(len(self.client.sent_texts), 9)
+        self.assertEqual(self.bridge.get_delivery_summary("uid-1")["consecutive_send_count"], 9)
+
+    def test_ret_minus_two_on_ninth_message_buffers_original_text_without_notice(self):
+        for idx in range(8):
+            self.bridge.send("Alice", f"hello-{idx}")
+
+        def _raise_limit(to_user_id: str, text: str, context_token: str = "") -> dict:
+            raise RuntimeError(
+                "API限制(ret=-2)：距离该用户最后一次发消息可能已超24小时，无法主动下发。请在微信上让对方先发一条消息。"
+            )
+
+        self.client.send_text = _raise_limit
+        result = self.bridge.send("Alice", "hello-9")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["buffered"])
+        self.assertNotIn("quota_notice", result)
+
+        summary = self.bridge.get_delivery_summary("uid-1")
+        pending = db.get_pending_messages(summary["active_overflow_session_id"])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]["content"], "hello-9")
+
+        messages = db.get_messages(limit=20)
+        buffered = [message for message in messages if message["delivery_stage"] == "buffered"]
+        self.assertEqual(len(buffered), 1)
+        self.assertEqual(buffered[0]["text"], "hello-9")
+        self.assertNotIn("quota_notice", buffered[0]["meta"])
+
+    def test_read_timeout_on_ninth_message_keeps_quota_notice_in_uncertain_record(self):
+        for idx in range(8):
+            self.bridge.send("Alice", f"hello-{idx}")
+
+        def _raise_timeout(to_user_id: str, text: str, context_token: str = "") -> dict:
+            self.client.sent_texts.append((to_user_id, text, context_token))
+            raise requests.exceptions.ReadTimeout("Read timed out.")
+
+        self.client.send_text = _raise_timeout
+        result = self.bridge.send("Alice", "hello-9")
+
+        self.assertTrue(result["uncertain"])
+        self.assertTrue(result["quota_notice"])
+        self.assertEqual(self.bridge.get_delivery_summary("uid-1")["status"], "NORMAL")
+
+        messages = db.get_messages(limit=20)
+        uncertain = [message for message in messages if message["delivery_stage"] == "uncertain"]
+        self.assertEqual(len(uncertain), 1)
+        self.assertIn("额度即将用尽", uncertain[0]["text"])
+        self.assertTrue(uncertain[0]["meta"]["quota_notice"])
+
+    def test_ninth_image_does_not_append_quota_notice(self):
+        """图片无法拼接文字：第 9 张图片原样发送，计数照常累加，由第 10 条的上限提醒兜底。"""
+        for idx in range(8):
+            self.bridge.send("Alice", f"hello-{idx}")
+
+        image_bytes = b"\xff\xd8\xff" + b"\x00" * 200
+        result = self.bridge.send_image("Alice", image_bytes)
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["quota_notice"])
+        self.assertEqual(len(self.client.sent_images), 1)
+        self.assertEqual(self.client.sent_images[0][1], len(image_bytes))
+
+        summary = self.bridge.get_delivery_summary("uid-1")
+        self.assertEqual(summary["status"], "NORMAL")
+        self.assertEqual(summary["consecutive_send_count"], 9)
+
+        saved = self.bridge.db.get_message_by_msg_id(result["message_id"])
+        self.assertNotIn("额度即将用尽", saved["text"])
+        self.assertNotIn("quota_notice", saved["meta"] or {})
+
     def test_direct_send_returns_queryable_delivery_contract(self):
         result = self.bridge.send("Alice", "hello-direct")
 

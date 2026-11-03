@@ -16,7 +16,7 @@
 
 ---
 
-> **关于本分支**：本仓库 fork 自 [yuuouu/WeChat-Bridge](https://github.com/yuuouu/WeChat-Bridge)（MIT License），基于上游 v1.4.0 维护。版本号形如 `v1.4.0-0.2`，即「上游版本号 - 本分支修订号」。与上游相比：
+> **关于本分支**：本仓库 fork 自 [yuuouu/WeChat-Bridge](https://github.com/yuuouu/WeChat-Bridge)（MIT License），基于上游 v1.4.0 维护。版本号形如 `v1.4.0-0.3`，即「上游版本号 - 本分支修订号」。与上游相比：
 >
 > - 移除遥测、匿名统计以及启动时的版本检查，不再向任何统计服务发送请求
 > - 移除「通过微信远程操控 AI CLI」（Bridge Code Agent）模块

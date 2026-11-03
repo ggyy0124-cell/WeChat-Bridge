@@ -54,6 +54,11 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+# 连续发送到第 N 条时，在正文末尾追加“额度即将用尽”提醒，提示用户回复一次续期。
+# 有效范围 1 ~ MAX_CONSECUTIVE_SENDS-1；0 或超出范围表示关闭。修改后需重启服务生效。
+QUOTA_WARN_AT = _env_int("QUOTA_WARN_AT", MAX_CONSECUTIVE_SENDS - 1)
+
+
 class DeliveryMixin:
     """投递状态机 Mixin，注入 WeChatBridge。"""
 
@@ -196,6 +201,19 @@ class DeliveryMixin:
     def _build_limit_warning(self, for_pull: bool = False) -> str:
         return (
             "\n\n---\n\n## ⚠️ 微信 bot 10 条上限\n\n- 回复任意内容恢复消息发送，后续消息将自动缓存，可发送 `/pull` 拉取"
+        )
+
+    @staticmethod
+    def _is_quota_notice_count(count: int) -> bool:
+        """第 count 条是否需要附带“额度即将用尽”提醒；第 MAX 条由 _build_limit_warning 负责。"""
+        return 0 < QUOTA_WARN_AT < MAX_CONSECUTIVE_SENDS and count == QUOTA_WARN_AT
+
+    def _build_quota_notice(self, count: int) -> str:
+        remaining = max(MAX_CONSECUTIVE_SENDS - count, 0)
+        return (
+            "\n\n---\n\n## ⏳ 微信 bot 发送额度即将用尽\n\n"
+            f"- 本轮已发送 {count}/{MAX_CONSECUTIVE_SENDS} 条，仅剩 {remaining} 条\n"
+            "- 请现在回复任意内容续期；否则之后的推送会先缓存，回复后发送 `/pull` 才能收到"
         )
 
     # ── Overflow Session 管理 ──
@@ -529,6 +547,7 @@ class DeliveryMixin:
 
             next_count = current_count + 1
             warning_appended = False
+            quota_notice = False
             final_text = text
 
             if next_count == MAX_CONSECUTIVE_SENDS:
@@ -542,6 +561,11 @@ class DeliveryMixin:
                 else:
                     session = self.db.get_active_overflow_session(user_id)
                     active_session_id = session["id"] if session else active_session_id
+            elif image_data is None and self._is_quota_notice_count(next_count):
+                # 额度即将用尽：只在正文末尾追加提醒，不改变投递状态、不占用额外名额。
+                # 若本条随后因上游限制进入缓存，缓存的仍是原文（见 _buffer_message 调用处），避免 /pull 时出现过期提醒。
+                quota_notice = True
+                final_text = text + self._build_quota_notice(next_count)
 
             try:
                 if image_data is not None:
@@ -590,6 +614,8 @@ class DeliveryMixin:
                     if warning_appended:
                         resolved_meta["limit_warning"] = True
                         resolved_meta["blocked_reason"] = "quota_10"
+                    if quota_notice:
+                        resolved_meta["quota_notice"] = True
                     saved_message_id = None
                     if record_timeline:
                         saved_message_id = self._record_outbound_message(
@@ -622,6 +648,7 @@ class DeliveryMixin:
                         "ok": True,
                         "result": None,
                         "warning": warning_appended,
+                        "quota_notice": quota_notice,
                         "uncertain": True,
                         "delivery_stage": "uncertain",
                         "message_id": saved_message_id,
@@ -649,6 +676,8 @@ class DeliveryMixin:
                 if warning_appended:
                     resolved_meta["limit_warning"] = True
                     resolved_meta["blocked_reason"] = "quota_10"
+                if quota_notice:
+                    resolved_meta["quota_notice"] = True
                 saved_message_id = self._record_outbound_message(
                     contact_name=contact_name,
                     user_id=user_id,
@@ -681,6 +710,7 @@ class DeliveryMixin:
                     "ok": True,
                     "result": result,
                     "warning": warning_appended,
+                    "quota_notice": quota_notice,
                     "uncertain": True,
                     "delivery_stage": "uncertain",
                     "message_id": None,
@@ -693,6 +723,7 @@ class DeliveryMixin:
                 "ok": True,
                 "result": result,
                 "warning": warning_appended,
+                "quota_notice": quota_notice,
                 "delivery_stage": effective_delivery_stage,
                 "message_id": saved_message_id,
                 "pending_message_id": None,

@@ -244,6 +244,7 @@ curl http://localhost:5200/api/status
 | `PENDING_TIME_SENSITIVE_TTL_HOURS` | `24` | 行情、保活、设备上下线等时效缓存消息保留小时数 |
 | `PENDING_MEDIA_TTL_HOURS` | `168` | 图片等媒体缓存消息保留小时数 |
 | `PENDING_CLEANUP_INTERVAL_SECONDS` | `3600` | 过期缓存后台清理间隔；启动时也会立即清理一次 |
+| `QUOTA_WARN_AT` | `9` | 连续发送到第 N 条时，在该条文字消息末尾追加“额度即将用尽，请回复一次”的提醒；有效范围 `1`~`9`，设为 `0` 或超出范围表示关闭，修改后需重启服务。图片、视频、语音、文件无法追加文字，不带该提醒；发送结果中的 `quota_notice` 为 `true` 表示本条已附带提醒 |
 | `ILINK_BOT_AGENT` | `WeChat-Bridge/<版本>` | 上送给 iLink 的可观测客户端标识；仅接受安全的 UA 风格 ASCII token |
 | `ILINK_ROUTE_TAG` | 空 | iLink 部署提供的可选 `SKRouteTag`；未配置时不发送 |
 | `ILINK_ENFORCE_LOCAL_SESSION_WINDOW` | `0` | 是否启用旧版 24h 本地预判；默认由服务端按 `context_token` 实际状态决定 |
